@@ -4,6 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 We're building the app described in @TECHNICAL_DOCUMENTATION.md. Read that file for general architectual task or to double-check the exact database structure, tech stack or application architecture.
 
+When working with any third-party libraries or something similar, you MUST look up the official documentation to ensure you are working with up-to-date information. 
+Use the DocsExplorer subagent for efficient documentation lookup.
+
 Keep your replies extremely concise and focus on conveying the key information. No unnecessary fluff, no long code snippets.
 
 @AGENTS.md
