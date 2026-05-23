@@ -10,7 +10,7 @@ import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { XivApiAction, JobAbilityRecord } from "@/types/job-ability";
 
 type AbilityTarget = "self" | "party" | "single";
-type AbilityType = "mitigation" | "regen" | "utility";
+type AbilityType = "mitigation" | "utility" | "buff" | "interrupt";
 
 interface SavedAbility {
   xivapiId: number;
@@ -341,8 +341,9 @@ export default function AdminPage() {
                       className={selectCls}
                     >
                       <option value="mitigation">Mitigation</option>
-                      <option value="regen">Regen</option>
                       <option value="utility">Utility</option>
+                      <option value="buff">Buff</option>
+                      <option value="interrupt">Interrupt</option>
                     </select>
                   </td>
                 </tr>

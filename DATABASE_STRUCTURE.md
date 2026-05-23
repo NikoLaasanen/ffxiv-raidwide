@@ -67,7 +67,7 @@ Role actions are stored once with a `jobs` array covering all applicable jobs.
 | `mitigationPhysical` | `number` | % damage reduction vs physical (0–100) |
 | `mitigationMagical` | `number` | % damage reduction vs magical (0–100) |
 | `target` | `"self" \| "party" \| "single"` | Who receives the buff |
-| `abilityType` | `"mitigation" \| "regen" \| "utility"` | Category for UI filtering |
+| `abilityType` | `"mitigation" \| "utility" \| "buff" \| "interrupt"` | Category for UI filtering |
 | `isRoleAction` | `boolean` | True if shared across a role |
 | `enabled` | `boolean` | Default visibility in the planner |
 | `createdAt` | `number` | Unix ms |

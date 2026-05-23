@@ -199,12 +199,21 @@ bossAbility: string
 damageEvent?: DamageEvent
 playerMistakes: Record<playerId, PlayerMistakeState>
 hidden: boolean
+sourceName?: string       // ability source name from FFLogs
+mechanicType?: MechanicType
+```
+
+### MechanicType
+
+```typescript
+type MechanicType = "enrage" | "tankbuster" | "party" | "single" | "unknown"
 ```
 
 ### DamageEvent
 
 ```typescript
 rawDamage: number
+allDamages: number[]      // all observed damage values (e.g. across multiple targets)
 type: "physical" | "magical" | "unique"
 overriddenType?: boolean
 ```
@@ -213,8 +222,17 @@ overriddenType?: boolean
 
 ```typescript
 dead: boolean
+deathTimestamp?: number
 damageDown: boolean
-vulnerabilityStacks: number
+damageDownDuration?: number
+damageDownTimestamp?: number
+weakness: boolean           // replaces vulnerabilityStacks — tracks weakness debuff
+weaknessDuration?: number
+weaknessTimestamp?: number
+brinkOfDeath: boolean       // separate from weakness; distinct debuff tier
+brinkOfDeathDuration?: number
+brinkOfDeathTimestamp?: number
+deadGray?: boolean          // row is grayed because player is dead at this point
 ```
 
 ### MitigationAssignment
@@ -236,6 +254,8 @@ mistakeColumnsEnabled: boolean
 
 ### Ability
 
+Defined in `types/player.ts` but the timeline reads from `JobAbilityRecord` (Firestore data) directly.
+
 ```typescript
 id: string
 name: string
@@ -246,6 +266,11 @@ type: "physical" | "magical" | "all"
 target: "self" | "party" | "tank"
 enabled: boolean
 ```
+
+### JobAbilityRecord (Firestore — `job_abilities` collection)
+
+See `DATABASE_STRUCTURE.md` for the full schema. Key difference from `Ability`: mitigation is split into
+`mitigationPhysical` and `mitigationMagical` (separate percentages) rather than a single `mitigationPercent`.
 
 ### PhaseDivider
 

@@ -9,9 +9,20 @@ export interface DamageEvent {
 
 export interface PlayerMistakeState {
   dead: boolean;
+  deathTimestamp?: number;
   damageDown: boolean;
-  vulnerabilityStacks: number;
+  damageDownDuration?: number;
+  damageDownTimestamp?: number;
+  weakness: boolean;
+  weaknessDuration?: number;
+  weaknessTimestamp?: number;
+  brinkOfDeath: boolean;
+  brinkOfDeathDuration?: number;
+  brinkOfDeathTimestamp?: number;
+  deadGray?: boolean;
 }
+
+export type MechanicType = "enrage" | "tankbuster" | "party" | "single" | "unknown";
 
 export interface TimelineRow {
   timestamp: number;
@@ -19,6 +30,8 @@ export interface TimelineRow {
   damageEvent?: DamageEvent;
   playerMistakes: Record<string, PlayerMistakeState>;
   hidden: boolean;
+  sourceName?: string;
+  mechanicType?: MechanicType;
 }
 
 export interface MitigationAssignment {

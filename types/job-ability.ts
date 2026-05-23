@@ -21,7 +21,7 @@ export interface JobAbilityRecord {
   mitigationPhysical: number;
   mitigationMagical: number;
   target: "self" | "party" | "single";
-  abilityType: "mitigation" | "regen" | "utility";
+  abilityType: "mitigation" | "utility" | "buff" | "interrupt";
   isRoleAction: boolean;
   enabled: boolean;
   createdAt: number;

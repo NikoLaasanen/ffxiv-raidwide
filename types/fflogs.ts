@@ -36,6 +36,7 @@ export interface FFLogsRawEvent {
   sourceID: number;
   targetID: number;
   abilityGameID: number;
+  sourceInstance?: number;
   amount?: number;
   unmitigatedAmount?: number;
   absorbed?: number;
