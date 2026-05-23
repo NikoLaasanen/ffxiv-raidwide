@@ -30,7 +30,7 @@ export default function NewPlanPage() {
         </p>
       </div>
 
-      <Timeline timeline={timeline} players={players} />
+      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} />
 
       <div className="mt-6 flex items-center gap-3">
         <Button disabled>Save Plan</Button>

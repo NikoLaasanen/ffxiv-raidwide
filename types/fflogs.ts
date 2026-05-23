@@ -66,8 +66,16 @@ export interface FFLogsEventsResponse {
   };
 }
 
+export interface PlayerCastEvent {
+  playerId: string;
+  abilityGameId: number;
+  abilityName: string;
+  timestamp: number;
+}
+
 export interface FflogsImportResult {
   fight: FFLogsFight;
   players: Player[];
   timeline: TimelineRow[];
+  casts: PlayerCastEvent[];
 }

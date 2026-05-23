@@ -5,13 +5,21 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { saveJobAbilities } from "@/lib/job-ability-service";
 import { JOB_GROUPS, JOB_NAMES, ALL_JOBS } from "@/lib/jobs";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { XivApiAction, JobAbilityRecord } from "@/types/job-ability";
 
 type AbilityTarget = "self" | "party" | "single";
 type AbilityType = "mitigation" | "regen" | "utility";
+
+interface SavedAbility {
+  xivapiId: number;
+  duration: number;
+  mitigationPhysical: number;
+  mitigationMagical: number;
+  target: AbilityTarget;
+  abilityType: AbilityType;
+}
 
 interface EditRow extends XivApiAction {
   checked: boolean;
@@ -21,18 +29,20 @@ interface EditRow extends XivApiAction {
   mitigationMagical: string;
   target: AbilityTarget;
   abilityType: AbilityType;
+  existsInDb: boolean;
 }
 
-function toEditRow(action: XivApiAction): EditRow {
+function toEditRow(action: XivApiAction, saved?: SavedAbility): EditRow {
   return {
     ...action,
     checked: false,
     cooldownEdit: String(action.cooldown),
-    durationEdit: String(action.duration),
-    mitigationPhysical: "0",
-    mitigationMagical: "0",
-    target: "party",
-    abilityType: "mitigation",
+    durationEdit: saved ? String(saved.duration) : "0",
+    mitigationPhysical: saved ? String(saved.mitigationPhysical) : "0",
+    mitigationMagical: saved ? String(saved.mitigationMagical) : "0",
+    target: saved?.target ?? "party",
+    abilityType: saved?.abilityType ?? "mitigation",
+    existsInDb: !!saved,
   };
 }
 
@@ -77,11 +87,18 @@ export default function AdminPage() {
     setIsLoading(true);
     setStatus("Loading from XIVAPI…");
     try {
-      const res = await fetch(`/api/xivapi/actions?job=${selectedJob}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "XIVAPI request failed");
-      const actions = data.actions as XivApiAction[];
-      setRows(actions.map(toEditRow));
+      const [xivapiRes, dbRes] = await Promise.all([
+        fetch(`/api/xivapi/actions?job=${selectedJob}`),
+        fetch(`/api/admin/abilities?job=${selectedJob}`),
+      ]);
+      const [xivapiData, dbData] = await Promise.all([xivapiRes.json(), dbRes.json()]);
+      if (!xivapiRes.ok) throw new Error(xivapiData.error ?? "XIVAPI request failed");
+
+      const savedMap = new Map<number, SavedAbility>(
+        dbRes.ok ? dbData.abilities.map((s: SavedAbility) => [s.xivapiId, s]) : []
+      );
+      const actions = xivapiData.actions as XivApiAction[];
+      setRows(actions.map((a) => toEditRow(a, savedMap.get(a.xivapiId))));
       setStatus(`Loaded ${actions.length} abilities for ${JOB_NAMES[selectedJob]}`);
     } catch (e) {
       setStatus(`Error: ${e instanceof Error ? e.message : String(e)}`);
@@ -96,8 +113,20 @@ export default function AdminPage() {
     setIsSaving(true);
     try {
       const records = selected.map((r) => toAbilityRecord(r, selectedJob));
-      await saveJobAbilities(records);
-      setStatus(`Saved ${records.length} abilities`);
+      const res = await fetch("/api/admin/abilities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(records),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      const savedIds = new Set(selected.map((r) => r.xivapiId));
+      setRows((prev) =>
+        prev.map((r) =>
+          savedIds.has(r.xivapiId) ? { ...r, checked: false, existsInDb: true } : r
+        )
+      );
+      setStatus(`Saved ${data.saved} abilities`);
     } catch (e) {
       setStatus(`Save error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -252,10 +281,16 @@ export default function AdminPage() {
                         Role
                       </span>
                     )}
+                    {row.existsInDb && (
+                      <span className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">
+                        Saved
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-1.5">
                     <input
                       type="number"
+                      min="0"
                       value={row.cooldownEdit}
                       onChange={(e) => updateRow(i, { cooldownEdit: e.target.value })}
                       className={inputCls}
@@ -264,6 +299,7 @@ export default function AdminPage() {
                   <td className="px-3 py-1.5">
                     <input
                       type="number"
+                      min="0"
                       value={row.durationEdit}
                       onChange={(e) => updateRow(i, { durationEdit: e.target.value })}
                       className={inputCls}
@@ -272,6 +308,7 @@ export default function AdminPage() {
                   <td className="px-3 py-1.5">
                     <input
                       type="number"
+                      min="0"
                       value={row.mitigationPhysical}
                       onChange={(e) => updateRow(i, { mitigationPhysical: e.target.value })}
                       className={inputCls}
@@ -280,6 +317,7 @@ export default function AdminPage() {
                   <td className="px-3 py-1.5">
                     <input
                       type="number"
+                      min="0"
                       value={row.mitigationMagical}
                       onChange={(e) => updateRow(i, { mitigationMagical: e.target.value })}
                       className={inputCls}

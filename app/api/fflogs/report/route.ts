@@ -6,6 +6,7 @@ import type {
   FFLogsActor,
   FFLogsAbility,
   FFLogsFight,
+  PlayerCastEvent,
 } from "@/types/fflogs";
 import type { Player } from "@/types/player";
 import type { TimelineRow, PlayerMistakeState } from "@/types/timeline";
@@ -69,8 +70,8 @@ async function fetchAllEvents(
 
 function mapDamageType(fflogsType: number): DamageType {
   if (fflogsType & 64) return "magical";
-  if (fflogsType & 1024) return "darkness";
-  return "physical";
+  if (fflogsType & 1024) return "unique";
+  return "magical";
 }
 
 function findClosestRow(timeline: TimelineRow[], timestamp: number, windowMs: number): TimelineRow | null {
@@ -105,8 +106,14 @@ function normalizeTimeline(
   const deaths = rawDeaths.map(normalize);
   const debuffs = rawDebuffs.map(normalize);
 
+  const SKIPPED_ABILITIES = new Set(["Combined DoTs"]);
+
   const bossHits = damageTaken
-    .filter((e) => bossActorIds.has(e.sourceID) && e.hitType !== 2)
+    .filter((e) => {
+      if (!bossActorIds.has(e.sourceID) || e.hitType === 2) return false;
+      const name = abilityByGameId.get(e.abilityGameID)?.name;
+      return !name || !SKIPPED_ABILITIES.has(name);
+    })
     .sort((a, b) => a.timestamp - b.timestamp);
 
   const groups: FFLogsRawEvent[][] = [];
@@ -134,27 +141,52 @@ function normalizeTimeline(
       players.map((p) => [p.id, { dead: false, damageDown: false, vulnerabilityStacks: 0 }])
     );
 
-  const timeline: TimelineRow[] = groups.map((group) => {
+  const rawTimeline: TimelineRow[] = groups.map((group) => {
     const first = group[0];
     const abilityInfo = abilityByGameId.get(first.abilityGameID);
     const bossAbilityName = abilityInfo?.name ?? `Unknown (${first.abilityGameID})`;
-    const representative = group.find((e) => (e.unmitigatedAmount ?? e.amount ?? 0) > 0) ?? first;
-    const rawDamage = representative.unmitigatedAmount ?? representative.amount ?? 0;
+    const allDamages = group
+      .map((e) => e.unmitigatedAmount ?? 0)
+      .filter((d) => d > 0);
+    const rawDamage =
+      allDamages.length > 0
+        ? Math.round(allDamages.reduce((a, b) => a + b, 0) / allDamages.length)
+        : 0;
 
     return {
       timestamp: first.timestamp,
       bossAbility: bossAbilityName,
       damageEvent:
         rawDamage > 0
-          ? {
-              rawDamage,
-              type: abilityInfo ? mapDamageType(abilityInfo.type) : "magical",
-            }
+          ? { rawDamage, allDamages, type: abilityInfo ? mapDamageType(abilityInfo.type) : "magical" }
           : undefined,
       playerMistakes: playerMistakesBase(),
       hidden: bossAbilityName === "Attack",
     };
   });
+
+  const sortedRaw = rawTimeline.sort((a, b) => a.timestamp - b.timestamp);
+  const timeline: TimelineRow[] = [];
+  for (const row of sortedRaw) {
+    const last = timeline[timeline.length - 1];
+    if (last && last.bossAbility === row.bossAbility && row.timestamp - last.timestamp <= 1000) {
+      if (row.damageEvent && last.damageEvent) {
+        last.damageEvent.allDamages.push(...row.damageEvent.allDamages);
+        last.damageEvent.rawDamage = Math.round(
+          last.damageEvent.allDamages.reduce((a, b) => a + b, 0) / last.damageEvent.allDamages.length
+        );
+      } else if (row.damageEvent) {
+        last.damageEvent = { ...row.damageEvent, allDamages: [...row.damageEvent.allDamages] };
+      }
+    } else {
+      timeline.push({
+        ...row,
+        damageEvent: row.damageEvent
+          ? { ...row.damageEvent, allDamages: [...row.damageEvent.allDamages] }
+          : undefined,
+      });
+    }
+  }
 
   const playerIdSet = new Set(players.map((p) => p.id));
 
@@ -228,10 +260,13 @@ export async function POST(request: Request): Promise<Response> {
       mistakeColumnsEnabled: true,
     }));
 
-    const [damageTaken, deaths, debuffs] = await Promise.all([
+    const playerActorIdSet = new Set(playerActors.map((a) => a.id));
+
+    const [damageTaken, deaths, debuffs, rawCasts] = await Promise.all([
       fetchAllEvents(reportCode, fightId as number, "DamageTaken"),
       fetchAllEvents(reportCode, fightId as number, "Deaths"),
       fetchAllEvents(reportCode, fightId as number, "Debuffs"),
+      fetchAllEvents(reportCode, fightId as number, "Casts"),
     ]);
 
     const timeline = normalizeTimeline(
@@ -244,7 +279,16 @@ export async function POST(request: Request): Promise<Response> {
       fight.startTime
     );
 
-    return Response.json({ fight, players, timeline });
+    const casts: PlayerCastEvent[] = rawCasts
+      .filter((e) => e.type === "cast" && playerActorIdSet.has(e.sourceID))
+      .map((e) => ({
+        playerId: String(e.sourceID),
+        abilityGameId: e.abilityGameID,
+        abilityName: abilityByGameId.get(e.abilityGameID)?.name ?? `Unknown (${e.abilityGameID})`,
+        timestamp: e.timestamp - fight.startTime,
+      }));
+
+    return Response.json({ fight, players, timeline, casts });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return Response.json({ error: message }, { status: 500 });

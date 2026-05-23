@@ -1,1 +1,1 @@
-export type DamageType = "physical" | "magical" | "darkness";
+export type DamageType = "physical" | "magical" | "unique";

@@ -2,6 +2,7 @@ import type { DamageType } from "@/types/common";
 
 export interface DamageEvent {
   rawDamage: number;
+  allDamages: number[];
   type: DamageType;
   overriddenType?: boolean;
 }

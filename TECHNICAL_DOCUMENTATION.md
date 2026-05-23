@@ -205,7 +205,7 @@ hidden: boolean
 
 ```typescript
 rawDamage: number
-type: "physical" | "magical" | "darkness"
+type: "physical" | "magical" | "unique"
 overriddenType?: boolean
 ```
 
