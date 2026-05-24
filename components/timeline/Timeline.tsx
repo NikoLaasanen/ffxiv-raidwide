@@ -33,6 +33,7 @@ interface TimelineProps {
   phases?: PhaseDivider[];
   initialAssignments?: MitigationAssignment[];
   onAssignmentsChange?: (a: MitigationAssignment[]) => void;
+  onPhasesChange?: (phases: PhaseDivider[]) => void;
   readOnly?: boolean;
   viewLinkId?: string;
   title?: string;
@@ -544,7 +545,7 @@ const TimelineBodyRow = memo(
     )
 );
 
-export function Timeline({ timeline, players, casts, phases = [], initialAssignments, onAssignmentsChange, readOnly, viewLinkId, title, encounterId }: TimelineProps) {
+export function Timeline({ timeline, players, casts, phases = [], initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -591,6 +592,14 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
   }
 
   const [localPhases, setLocalPhases] = useState<PhaseDivider[]>(phases);
+  const [prevPhases, setPrevPhases] = useState<PhaseDivider[]>(phases);
+  if (prevPhases !== phases) {
+    setPrevPhases(phases);
+    setLocalPhases(phases);
+  }
+  const onPhasesChangeRef = useRef(onPhasesChange);
+  useLayoutEffect(() => { onPhasesChangeRef.current = onPhasesChange; });
+  useEffect(() => { onPhasesChangeRef.current?.(localPhases); }, [localPhases]);
 
   function addPhase(atTimestamp: number) {
     setLocalPhases((prev) => {

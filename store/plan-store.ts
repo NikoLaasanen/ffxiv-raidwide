@@ -42,7 +42,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       comparisonLabel: null,
 
       _setHasHydrated: (v) => set({ _hasHydrated: v }),
-      setPlan: (plan) => set({ plan, past: [], future: [] }),
+      setPlan: (plan) => set({ plan, past: [], future: [], comparisonAssignments: null, comparisonLabel: null }),
       setPendingImport: (data) => set({ pendingImport: data }),
 
       updatePlan: (updater) => {

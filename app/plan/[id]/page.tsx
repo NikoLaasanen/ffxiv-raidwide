@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
 import { getPlan, updatePlan } from "@/lib/plan-service";
 import { Timeline } from "@/components/timeline/Timeline";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import type { Plan } from "@/types/plan";
 import type { MitigationAssignment } from "@/types/timeline";
+import type { PhaseDivider } from "@/types/player";
 
 export default function PlanPage({
   params,
@@ -19,6 +21,7 @@ export default function PlanPage({
   const storePlan = usePlanStore((s) => s.plan);
   const hasHydrated = usePlanStore((s) => s._hasHydrated);
   const setPlan = usePlanStore((s) => s.setPlan);
+  const router = useRouter();
 
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -26,6 +29,8 @@ export default function PlanPage({
   const [saved, setSaved] = useState(false);
   const [currentAssignments, setCurrentAssignments] = useState<MitigationAssignment[]>([]);
   const handleAssignmentsChange = useCallback((a: MitigationAssignment[]) => setCurrentAssignments(a), []);
+  const [currentPhases, setCurrentPhases] = useState<PhaseDivider[]>([]);
+  const handlePhasesChange = useCallback((p: PhaseDivider[]) => setCurrentPhases(p), []);
 
   // Load plan from Firebase if the store doesn't already have it
   useEffect(() => {
@@ -51,7 +56,7 @@ export default function PlanPage({
     setSaving(true);
     setSaved(false);
     try {
-      const updated: Plan = { ...storePlan, updatedAt: Date.now(), assignments: currentAssignments };
+      const updated: Plan = { ...storePlan, updatedAt: Date.now(), assignments: currentAssignments, phases: currentPhases };
       await updatePlan(updated);
       setPlan(updated);
       setSaved(true);
@@ -117,6 +122,7 @@ export default function PlanPage({
         phases={storePlan.phases}
         initialAssignments={storePlan.assignments ?? []}
         onAssignmentsChange={handleAssignmentsChange}
+        onPhasesChange={handlePhasesChange}
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}
@@ -125,6 +131,9 @@ export default function PlanPage({
       <div className="mt-6 flex items-center gap-3">
         <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save Plan"}
+        </Button>
+        <Button variant="outline" onClick={() => router.push(`/plan/view/${storePlan.viewLinkId}`)}>
+          View
         </Button>
         {saved && (
           <span className="text-sm text-green-500">Saved</span>
