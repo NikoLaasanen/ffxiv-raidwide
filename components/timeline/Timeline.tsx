@@ -19,6 +19,8 @@ import { useJobAbilities } from "@/hooks/use-job-abilities";
 import { computeRowMitigation } from "@/lib/compute-mitigation";
 import type { RowMitigation } from "@/lib/compute-mitigation";
 import { usePreferencesStore } from "@/store/preferences-store";
+import { useShallow } from "zustand/react/shallow";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
 
 interface TimelineProps {
@@ -141,7 +143,7 @@ function MistakeCell({ mistakes }: { mistakes?: PlayerMistakeState }) {
   );
 }
 
-function PhaseDividerRow({
+const PhaseDividerRow = memo(function PhaseDividerRow({
   phase,
   endTimestamp,
   colCount,
@@ -211,7 +213,7 @@ function PhaseDividerRow({
       </td>
     </tr>
   );
-}
+});
 
 interface RowProps {
   row: TimelineRow;
@@ -482,7 +484,18 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
     activationBuffer,
     abilityTargetFilter,
     abilityTypeFilter,
-  } = usePreferencesStore();
+  } = usePreferencesStore(
+    useShallow((s) => ({
+      showAutoAttacks: s.showAutoAttacks,
+      showDamageColumn: s.showDamageColumn,
+      showSourceColumn: s.showSourceColumn,
+      showMechanicTypeColumn: s.showMechanicTypeColumn,
+      showMistakesColumn: s.showMistakesColumn,
+      activationBuffer: s.activationBuffer,
+      abilityTargetFilter: s.abilityTargetFilter,
+      abilityTypeFilter: s.abilityTypeFilter,
+    }))
+  );
 
   const allJobs = useMemo(
     () =>
@@ -510,72 +523,51 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
       return [...prev, { timestamp: atTimestamp, name: `Phase ${prev.length + 1}`, collapsed: false }];
     });
   }
-  function togglePhase(timestamp: number) {
+  const stableTogglePhase = useCallback((timestamp: number) => {
     setLocalPhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, collapsed: !p.collapsed } : p));
-  }
-  function renamePhase(timestamp: number, name: string) {
+  }, []);
+  const stableRenamePhase = useCallback((timestamp: number, name: string) => {
     setLocalPhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, name } : p));
-  }
-  function removePhase(timestamp: number) {
+  }, []);
+  const stableRemovePhase = useCallback((timestamp: number) => {
     setLocalPhases((prev) => prev.filter((p) => p.timestamp !== timestamp));
-  }
+  }, []);
 
   const playerByJob = useMemo(
     () => new Map(players.map((p) => [p.job, p])),
     [players]
   );
 
-  const worstMistakeByPlayer = useMemo((): Map<string, "death" | "damageDown"> => {
-    const result = new Map<string, "death" | "damageDown">();
-    for (const row of timeline) {
-      for (const player of players) {
-        const m = row.playerMistakes[player.id];
-        if (!m) continue;
-        if (m.dead) { result.set(player.id, "death"); }
-        else if (m.damageDownTimestamp != null && result.get(player.id) !== "death") {
-          result.set(player.id, "damageDown");
-        }
-      }
-    }
-    return result;
-  }, [timeline, players]);
-
-  const playerMistakeTimestamps = useMemo((): Map<string, { deaths: number[]; damageDowns: number[] }> => {
-    const result = new Map<string, { deaths: number[]; damageDowns: number[] }>();
+  const { worstMistakeByPlayer, playerMistakeTimestamps, playerStatusRanges } = useMemo(() => {
+    const worst = new Map<string, "death" | "damageDown">();
+    const timestamps = new Map<string, { deaths: number[]; damageDowns: number[] }>();
+    const statusRanges = new Map<string, PlayerRanges>();
     for (const player of players) {
-      result.set(player.id, { deaths: [], damageDowns: [] });
+      timestamps.set(player.id, { deaths: [], damageDowns: [] });
+      statusRanges.set(player.id, { deadRows: [], weaknesses: [], brinks: [], damageDowns: [] });
     }
     for (const row of timeline) {
       for (const player of players) {
         const m = row.playerMistakes[player.id];
         if (!m) continue;
-        const entry = result.get(player.id)!;
-        if (m.dead && m.deathTimestamp != null) entry.deaths.push(m.deathTimestamp);
-        if (m.damageDownTimestamp != null) entry.damageDowns.push(m.damageDownTimestamp);
-      }
-    }
-    return result;
-  }, [timeline, players]);
-
-  const playerStatusRanges = useMemo((): Map<string, PlayerRanges> => {
-    const map = new Map<string, PlayerRanges>();
-    for (const player of players)
-      map.set(player.id, { deadRows: [], weaknesses: [], brinks: [], damageDowns: [] });
-    for (const row of timeline) {
-      for (const player of players) {
-        const m = row.playerMistakes[player.id];
-        if (!m) continue;
-        const entry = map.get(player.id)!;
-        if (m.dead) entry.deadRows.push(row.timestamp);
+        if (m.dead) { worst.set(player.id, "death"); }
+        else if (m.damageDownTimestamp != null && worst.get(player.id) !== "death") {
+          worst.set(player.id, "damageDown");
+        }
+        const ts = timestamps.get(player.id)!;
+        if (m.dead && m.deathTimestamp != null) ts.deaths.push(m.deathTimestamp);
+        if (m.damageDownTimestamp != null) ts.damageDowns.push(m.damageDownTimestamp);
+        const r = statusRanges.get(player.id)!;
+        if (m.dead) r.deadRows.push(row.timestamp);
         if (m.weaknessTimestamp != null && m.weaknessDuration != null)
-          entry.weaknesses.push({ start: row.timestamp, end: m.weaknessTimestamp + m.weaknessDuration * 1000 });
+          r.weaknesses.push({ start: row.timestamp, end: m.weaknessTimestamp + m.weaknessDuration * 1000 });
         if (m.brinkOfDeathTimestamp != null && m.brinkOfDeathDuration != null)
-          entry.brinks.push({ start: row.timestamp, end: m.brinkOfDeathTimestamp + m.brinkOfDeathDuration * 1000 });
+          r.brinks.push({ start: row.timestamp, end: m.brinkOfDeathTimestamp + m.brinkOfDeathDuration * 1000 });
         if (m.damageDownTimestamp != null && m.damageDownDuration != null)
-          entry.damageDowns.push({ start: row.timestamp, end: m.damageDownTimestamp + m.damageDownDuration * 1000 });
+          r.damageDowns.push({ start: row.timestamp, end: m.damageDownTimestamp + m.damageDownDuration * 1000 });
       }
     }
-    return map;
+    return { worstMistakeByPlayer: worst, playerMistakeTimestamps: timestamps, playerStatusRanges: statusRanges };
   }, [timeline, players]);
 
   const assignedSet = useMemo(
@@ -780,6 +772,18 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
     return items;
   }, [visibleRows, localPhases]);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: displayItems.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 40,
+    overscan: 8,
+  });
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const totalVirtualHeight = rowVirtualizer.getTotalSize();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom = totalVirtualHeight - (virtualItems.length > 0 ? virtualItems[virtualItems.length - 1].end : 0);
+
   // Stable refs so memoized rows never see new function props on unrelated re-renders
   const cycleRef = useRef(cycleDamageType);
   const stableCycle = useCallback((bossAbility: string) => cycleRef.current(bossAbility), []);
@@ -805,7 +809,7 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
         <div className="flex items-center justify-end gap-2">
           <PreferencesDialog />
         </div>
-        <div className="relative overflow-auto max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <div ref={scrollContainerRef} className="relative overflow-auto max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-zinc-800">
           {isLoading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-zinc-950/70 backdrop-blur-[2px]">
               <div className="flex flex-col items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -923,16 +927,20 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
               </tr>
             </thead>
             <tbody>
-              {displayItems.map((item) =>
-                item.kind === "phase" ? (
+              {paddingTop > 0 && (
+                <tr><td colSpan={totalColCount} style={{ height: paddingTop }} /></tr>
+              )}
+              {virtualItems.map((vItem) => {
+                const item = displayItems[vItem.index];
+                return item.kind === "phase" ? (
                   <PhaseDividerRow
                     key={`phase-${item.phase.timestamp}`}
                     phase={item.phase}
                     endTimestamp={item.endTimestamp}
                     colCount={totalColCount}
-                    onToggle={togglePhase}
-                    onRename={renamePhase}
-                    onRemove={removePhase}
+                    onToggle={stableTogglePhase}
+                    onRename={stableRenamePhase}
+                    onRemove={stableRemovePhase}
                   />
                 ) : (
                   <TimelineBodyRow
@@ -954,7 +962,10 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
                     onCycle={stableCycle}
                     onAddPhase={stableAddPhase}
                   />
-                )
+                );
+              })}
+              {paddingBottom > 0 && (
+                <tr><td colSpan={totalColCount} style={{ height: paddingBottom }} /></tr>
               )}
             </tbody>
           </table>
