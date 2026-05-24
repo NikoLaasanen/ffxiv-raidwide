@@ -97,25 +97,6 @@ export default function PlanPage({
 
   return (
     <main className="p-8">
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{storePlan.title}</h1>
-          {storePlan.raidplanLink && (
-            <a
-              href={storePlan.raidplanLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-            >
-              View on FFLogs ↗
-            </a>
-          )}
-        </div>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {storePlan.players.length} players · {visibleRows.length} timeline events · {duration}
-        </p>
-      </div>
-
       <Timeline
         timeline={storePlan.timeline}
         players={storePlan.players}
@@ -126,6 +107,26 @@ export default function PlanPage({
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}
+        headerLeft={
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">{storePlan.title}</h1>
+              {storePlan.raidplanLink && (
+                <a
+                  href={storePlan.raidplanLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
+                >
+                  View on FFLogs ↗
+                </a>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {storePlan.players.length} players · {visibleRows.length} timeline events · {duration}
+            </p>
+          </div>
+        }
       />
 
       <div className="mt-6 flex items-center gap-3">

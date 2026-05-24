@@ -38,6 +38,7 @@ interface TimelineProps {
   viewLinkId?: string;
   title?: string;
   encounterId?: string | null;
+  headerLeft?: React.ReactNode;
 }
 
 type CellState = {
@@ -54,21 +55,29 @@ type DisplayItem =
 
 const TYPE_CYCLE: DamageType[] = ["magical", "physical", "unique"];
 
+const JOB_ROLE_COLOR: Partial<Record<JobAbbreviation, string>> = {
+  PLD:'#60a5fa', WAR:'#60a5fa', DRK:'#60a5fa', GNB:'#60a5fa',
+  WHM:'#4ade80', SCH:'#4ade80', AST:'#4ade80', SGE:'#4ade80',
+  DRG:'#f472b6', MNK:'#f472b6', NIN:'#f472b6', SAM:'#f472b6', RPR:'#f472b6', VPR:'#f472b6',
+  BRD:'#fbbf24', MCH:'#fbbf24', DNC:'#fbbf24',
+  BLM:'#c084fc', SMN:'#c084fc', RDM:'#c084fc', PCT:'#c084fc',
+};
+
 const DAMAGE_TYPE_ICON: Record<DamageType, string> = {
   magical:  "/icons/MagicalDamage.png",
   physical: "/icons/PhysicalDamage.png",
   unique:   "/icons/UniqueDamage.png",
 };
 
-const TH_BASE = "px-3 py-2.5 text-center font-medium text-zinc-500 dark:text-zinc-400";
-const TH_FIXED = "px-4 py-2.5 text-left font-medium text-zinc-500 dark:text-zinc-400";
+const TH_BASE = "px-3 py-2.5 text-center font-medium text-zinc-500 dark:text-slate-400";
+const TH_FIXED = "px-4 py-2.5 text-left font-medium text-zinc-500 dark:text-slate-400";
 
 const MECHANIC_BADGE: Record<MechanicType, { label: string; className: string }> = {
   enrage:     { label: "Enrage",     className: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" },
   tankbuster: { label: "Tankbuster", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400" },
   party:      { label: "Party",      className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400" },
-  single:     { label: "Single",     className: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400" },
-  unknown:    { label: "—",          className: "text-zinc-300 dark:text-zinc-600" },
+  single:     { label: "Single",     className: "bg-zinc-100 text-zinc-500 dark:bg-slate-800 dark:text-slate-400" },
+  unknown:    { label: "—",          className: "text-zinc-300 dark:text-slate-600" },
 };
 
 type ActivePeriod = { start: number; end: number };
@@ -85,7 +94,7 @@ function getMistakeBg(
   ranges: PlayerRanges | undefined,
 ): string | undefined {
   if (!ms) return undefined;
-  if (ms.deadGray) return "bg-zinc-200/70 dark:bg-zinc-700/40";
+  if (ms.deadGray) return "bg-zinc-200/70 dark:bg-slate-700/40";
   if (!ranges) return undefined;
 
   if (ranges.weaknesses.some((w) => rowTs >= w.start && rowTs <= w.end))
@@ -100,7 +109,7 @@ function getMistakeBg(
 
 function MechanicTypeBadge({ type }: { type?: MechanicType }) {
   if (!type || type === "unknown") {
-    return <span className="text-zinc-300 dark:text-zinc-600">—</span>;
+    return <span className="text-zinc-300 dark:text-slate-600">—</span>;
   }
   const { label, className } = MECHANIC_BADGE[type];
   return (
@@ -182,12 +191,12 @@ const PhaseDividerRow = memo(function PhaseDividerRow({
   }
 
   return (
-    <tr className="bg-zinc-100/80 dark:bg-zinc-800/60 border-y border-zinc-200 dark:border-zinc-700">
+    <tr className="bg-zinc-100/80 dark:bg-slate-800/60 border-y border-zinc-200 dark:border-slate-700">
       <td colSpan={colCount} className="px-3 py-1.5">
         <div className="flex items-center gap-2">
           <button
             onClick={() => onToggle(phase.timestamp)}
-            className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors shrink-0"
+            className="text-zinc-500 hover:text-zinc-700 dark:hover:text-slate-300 transition-colors shrink-0"
             aria-label={phase.collapsed ? "Expand phase" : "Collapse phase"}
           >
             {phase.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -202,23 +211,23 @@ const PhaseDividerRow = memo(function PhaseDividerRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") { setEditing(false); setDraft(phase.name); }
               }}
-              className="text-sm font-medium bg-transparent border-b border-zinc-400 dark:border-zinc-500 outline-none px-0.5 w-32 min-w-0"
+              className="text-sm font-medium bg-transparent border-b border-zinc-400 dark:border-slate-500 outline-none px-0.5 w-32 min-w-0"
             />
           ) : (
             <span
-              className={cn("text-sm font-medium", !readOnly && "cursor-text hover:text-blue-600 dark:hover:text-blue-400 transition-colors")}
+              className={cn("text-sm font-medium", !readOnly && "cursor-text hover:text-teal-600 dark:hover:text-teal-400 transition-colors")}
               onClick={readOnly ? undefined : () => { setEditing(true); setDraft(phase.name); }}
             >
               {phase.name}
             </span>
           )}
-          <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono">
+          <span className="text-xs text-zinc-400 dark:text-slate-500 font-mono">
             {formatTimestamp(phase.timestamp)} – {formatTimestamp(endTimestamp)}
           </span>
           {!readOnly && (
             <button
               onClick={() => onRemove(phase.timestamp)}
-              className="ml-auto text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors text-base leading-none px-1"
+              className="ml-auto text-zinc-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors text-base leading-none px-1"
               aria-label="Remove phase divider"
             >
               ×
@@ -262,16 +271,16 @@ const TimelineBodyRow = memo(
     return (
       <tr
         className={cn(
-          "group/row transition-colors hover:bg-blue-50/60 dark:hover:bg-blue-950/20",
-          index % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-zinc-50/50 dark:bg-zinc-900/50"
+          "group/row transition-colors hover:bg-teal-50/60 dark:hover:bg-teal-950/20",
+          index % 2 === 0 ? "bg-white dark:bg-slate-950" : "bg-zinc-50/50 dark:bg-slate-900/50"
         )}
       >
-        <td className="px-4 py-2 font-mono text-xs text-zinc-500 dark:text-zinc-400 relative">
+        <td className="px-4 py-2 font-mono text-xs text-zinc-500 dark:text-slate-400 relative">
           {formatTimestamp(row.timestamp)}
           {!readOnly && (
             <button
               onClick={() => onAddPhase(row.timestamp)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 w-4 h-4 rounded flex items-center justify-center text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all text-[10px] leading-none"
+              className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 w-4 h-4 rounded flex items-center justify-center text-slate-400 hover:text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-all text-[10px] leading-none"
               aria-label="Add phase divider here"
             >
               +
@@ -288,13 +297,13 @@ const TimelineBodyRow = memo(
                     {deathPlayers.length > 0 && (
                       <span className="inline-flex items-center gap-0.5">
                         <Image src="/icons/Death.png" alt="Deaths" width={14} height={14} />
-                        {deathPlayers.length > 1 && <span className="text-[10px] font-medium text-zinc-500">×{deathPlayers.length}</span>}
+                        {deathPlayers.length > 1 && <span className="text-[10px] font-medium text-slate-500">×{deathPlayers.length}</span>}
                       </span>
                     )}
                     {ddPlayers.length > 0 && (
                       <span className="inline-flex items-center gap-0.5">
                         <Image src="/icons/DamageDown.png" alt="Damage Downs" width={14} height={14} />
-                        {ddPlayers.length > 1 && <span className="text-[10px] font-medium text-zinc-500">×{ddPlayers.length}</span>}
+                        {ddPlayers.length > 1 && <span className="text-[10px] font-medium text-slate-500">×{ddPlayers.length}</span>}
                       </span>
                     )}
                   </button>
@@ -321,7 +330,7 @@ const TimelineBodyRow = memo(
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <span className="text-zinc-300 dark:text-zinc-600">—</span>
+              <span className="text-zinc-300 dark:text-slate-600">—</span>
             )}
           </td>
         )}
@@ -341,7 +350,7 @@ const TimelineBodyRow = memo(
                 ) : (
                   <button
                     onClick={() => onCycle(row.bossAbility)}
-                    className="block rounded p-0.5 hover:ring-2 hover:ring-zinc-300 dark:hover:ring-zinc-600 transition-shadow"
+                    className="block rounded p-0.5 hover:ring-2 hover:ring-zinc-300 dark:hover:ring-slate-600 transition-shadow"
                     aria-label={`Damage type: ${row.damageEvent.type}. Click to cycle.`}
                   >
                     <Image
@@ -358,14 +367,14 @@ const TimelineBodyRow = memo(
               </TooltipContent>
             </Tooltip>
           ) : (
-            <span className="text-zinc-400 dark:text-zinc-600">—</span>
+            <span className="text-zinc-400 dark:text-slate-600">—</span>
           )}
         </td>
-        <td className="px-4 py-2 text-right font-mono text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+        <td className="px-4 py-2 text-right font-mono text-xs tabular-nums text-zinc-500 dark:text-slate-400">
           {mitigation.totalMitPercent > 0 ? (
             `${Math.round(mitigation.totalMitPercent)}%`
           ) : (
-            <span className="text-zinc-300 dark:text-zinc-600">—</span>
+            <span className="text-zinc-300 dark:text-slate-600">—</span>
           )}
         </td>
         {isComparing && (() => {
@@ -374,11 +383,11 @@ const TimelineBodyRow = memo(
           return (
             <td className="px-3 py-2 text-center font-mono text-xs whitespace-nowrap">
               {addedCount === 0 && removedCount === 0 ? (
-                <span className="text-zinc-300 dark:text-zinc-600">—</span>
+                <span className="text-zinc-300 dark:text-slate-600">—</span>
               ) : (
                 <>
                   {addedCount > 0 && <span className="text-green-600 dark:text-green-400">+{addedCount}</span>}
-                  {addedCount > 0 && removedCount > 0 && <span className="text-zinc-400 dark:text-zinc-500"> / </span>}
+                  {addedCount > 0 && removedCount > 0 && <span className="text-zinc-400 dark:text-slate-500"> / </span>}
                   {removedCount > 0 && <span className="text-red-500 dark:text-red-400">−{removedCount}</span>}
                 </>
               )}
@@ -413,7 +422,7 @@ const TimelineBodyRow = memo(
           </td>
         )}
         {showSourceColumn && (
-          <td className="px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400 max-w-[8rem] truncate">
+          <td className="px-4 py-2 text-sm text-zinc-600 dark:text-slate-400 max-w-[8rem] truncate">
             {row.sourceName ?? "—"}
           </td>
         )}
@@ -430,7 +439,7 @@ const TimelineBodyRow = memo(
             const ms = row.playerMistakes[player.id];
             const mistakeBg = getMistakeBg(row.timestamp, ms, playerStatusRanges.get(player.id));
             return (
-              <td key={`${job}-mistakes`} className={cn("w-10 border-l border-zinc-100 dark:border-zinc-800 align-middle", mistakeBg)}>
+              <td key={`${job}-mistakes`} className={cn("w-10 border-l border-zinc-100 dark:border-slate-800 align-middle", mistakeBg)}>
                 <MistakeCell mistakes={ms} />
               </td>
             );
@@ -442,7 +451,7 @@ const TimelineBodyRow = memo(
               mistakeCell,
               <td
                 key={job}
-                className={cn("px-3 py-2 text-center text-zinc-300 dark:text-zinc-700", !showMistakes && "border-l border-zinc-100 dark:border-zinc-800")}
+                className={cn("px-3 py-2 text-center text-zinc-300 dark:text-slate-700", !showMistakes && "border-l border-zinc-100 dark:border-slate-800")}
               >
                 —
               </td>,
@@ -462,12 +471,12 @@ const TimelineBodyRow = memo(
                   "w-5 h-5 rounded mx-auto block transition-colors",
                   readOnly && "cursor-default pointer-events-none",
                   assigned
-                    ? "bg-blue-500 dark:bg-blue-400"
+                    ? "bg-teal-500 dark:bg-teal-400"
                     : onCooldown
-                    ? "bg-zinc-200 dark:bg-zinc-700 cursor-not-allowed opacity-50"
+                    ? "bg-zinc-200 dark:bg-slate-700 cursor-not-allowed opacity-50"
                     : inDuration
-                    ? "border border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-500"
-                    : "border border-zinc-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500",
+                    ? "border border-teal-200 dark:border-teal-800 hover:border-teal-400 dark:hover:border-teal-500"
+                    : "border border-zinc-300 dark:border-slate-600 hover:border-teal-400 dark:hover:border-teal-500",
                   compareState === "original-only" && "ring-2 ring-green-500 dark:ring-green-400",
                   compareState === "comparison-only" && "ring-2 ring-red-500 dark:ring-red-400"
                 )}
@@ -496,8 +505,8 @@ const TimelineBodyRow = memo(
                 key={`${job}-${ab.id}`}
                 className={cn(
                   "py-2 w-8 text-center",
-                  i === 0 && !showMistakes && "border-l border-zinc-100 dark:border-zinc-800",
-                  inDuration && "bg-blue-50 dark:bg-blue-950/30"
+                  i === 0 && !showMistakes && "border-l border-zinc-100 dark:border-slate-800",
+                  inDuration && "bg-teal-50 dark:bg-teal-950/30"
                 )}
               >
                 {onCooldown ? (
@@ -547,7 +556,7 @@ const TimelineBodyRow = memo(
 
 const EMPTY_PHASES: PhaseDivider[] = [];
 
-export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId }: TimelineProps) {
+export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId, headerLeft }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -919,47 +928,50 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-end gap-2">
-          {readOnly && comparisonLabel && (
-            <div className="flex items-center gap-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs text-zinc-600 dark:text-zinc-400">
-              <span className="font-medium">Comparing:</span>
-              <span className="max-w-[12rem] truncate">{comparisonLabel}</span>
-              <button
-                onClick={() => setComparison(null, null)}
-                aria-label="Clear comparison"
-                className="leading-none text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
-              >
-                ×
-              </button>
-            </div>
-          )}
-          {viewLinkId && title !== undefined && (
-            <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
-          )}
-          {readOnly && viewLinkId && (
-            <CompareDialog
-              originalPlayers={players}
-              originalTimeline={timeline}
-              originalTitle={title ?? ""}
-              abilitiesByJob={abilitiesByJob}
-              abilitiesLoading={isLoading}
-              onCompare={(a, label) => setComparison(a, label)}
-              onClear={() => setComparison(null, null)}
-            />
-          )}
-          <PreferencesDialog />
+        <div className="flex items-center justify-between gap-2">
+          {headerLeft ?? <div />}
+          <div className="flex items-center gap-2 shrink-0">
+            {readOnly && comparisonLabel && (
+              <div className="flex items-center gap-1.5 rounded-md bg-zinc-100 dark:bg-slate-800 px-2 py-1 text-xs text-zinc-600 dark:text-slate-400">
+                <span className="font-medium">Comparing:</span>
+                <span className="max-w-[12rem] truncate">{comparisonLabel}</span>
+                <button
+                  onClick={() => setComparison(null, null)}
+                  aria-label="Clear comparison"
+                  className="leading-none text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            {viewLinkId && title !== undefined && (
+              <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
+            )}
+            {readOnly && viewLinkId && (
+              <CompareDialog
+                originalPlayers={players}
+                originalTimeline={timeline}
+                originalTitle={title ?? ""}
+                abilitiesByJob={abilitiesByJob}
+                abilitiesLoading={isLoading}
+                onCompare={(a, label) => setComparison(a, label)}
+                onClear={() => setComparison(null, null)}
+              />
+            )}
+            <PreferencesDialog />
+          </div>
         </div>
-        <div ref={scrollContainerRef} className="relative overflow-auto max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-zinc-800">
+        <div ref={scrollContainerRef} className="relative overflow-auto max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
           {isLoading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-zinc-950/70 backdrop-blur-[2px]">
-              <div className="flex flex-col items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-zinc-700 dark:border-t-zinc-300" />
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-950/70 backdrop-blur-[2px]">
+              <div className="flex flex-col items-center gap-2 text-sm text-zinc-500 dark:text-slate-400">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600 dark:border-slate-700 dark:border-t-slate-300" />
                 Loading abilities…
               </div>
             </div>
           )}
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+            <thead className="sticky top-0 z-10 border-b border-zinc-200 dark:border-slate-800 bg-zinc-50 dark:bg-slate-900">
               <tr>
                 <th rowSpan={2} className={`${TH_FIXED} w-20`}>Time</th>
                 <th rowSpan={2} className={TH_FIXED}>Boss Ability</th>
@@ -985,7 +997,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                     <th
                       key={job}
                       colSpan={colSpan}
-                      className={`${TH_BASE} border-l border-zinc-200 dark:border-zinc-700`}
+                      className={`${TH_BASE} border-l border-zinc-200 dark:border-slate-700`}
                     >
                       {job}
                     </th>
@@ -1005,7 +1017,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                     const mistakeTimes = pId ? playerMistakeTimestamps.get(pId) : undefined;
                     const hasTooltip = mistakeTimes && (mistakeTimes.deaths.length > 0 || mistakeTimes.damageDowns.length > 0);
                     cells.push(
-                      <th key={`${job}-mistakes-hdr`} className="border-l border-zinc-200 dark:border-zinc-700 py-1 w-10 text-center">
+                      <th key={`${job}-mistakes-hdr`} className="border-l border-zinc-200 dark:border-slate-700 py-1 w-10 text-center">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="cursor-default inline-flex justify-center">
@@ -1014,7 +1026,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                               ) : worst === "damageDown" ? (
                                 <Image src="/icons/DamageDown.png" alt="Damage Down" width={16} height={16} />
                               ) : (
-                                <span className="text-zinc-400 text-xs">—</span>
+                                <span className="text-slate-400 text-xs">—</span>
                               )}
                             </div>
                           </TooltipTrigger>
@@ -1034,13 +1046,13 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                   }
 
                   if (abilities.length === 0) {
-                    cells.push(<th key={job} className={hasMistakes ? "py-1" : "border-l border-zinc-200 dark:border-zinc-700 py-1"} />);
+                    cells.push(<th key={job} className={hasMistakes ? "py-1" : "border-l border-zinc-200 dark:border-slate-700 py-1"} />);
                   } else {
                     abilities.forEach((ab, i) => {
                       cells.push(
                         <th
                           key={`${job}-${ab.id}`}
-                          className={`py-1 ${i === 0 && !hasMistakes ? "border-l border-zinc-200 dark:border-zinc-700" : ""}`}
+                          className={`py-1 ${i === 0 && !hasMistakes ? "border-l border-zinc-200 dark:border-slate-700" : ""}`}
                         >
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1054,7 +1066,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                             </TooltipTrigger>
                             <TooltipContent>
                               <div className="font-medium">{ab.name}</div>
-                              <div className="text-xs text-zinc-400">
+                              <div className="text-xs text-slate-400">
                                 Cooldown: {ab.cooldown}s{ab.duration > 0 ? ` | Duration: ${ab.duration}s` : ""}
                               </div>
                             </TooltipContent>
@@ -1115,11 +1127,51 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           </table>
         </div>
 
-        {!readOnly && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Jobs</p>
+        {!readOnly && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 p-4">
+          {/* Active roster strip — Option A */}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-slate-400">
+              Active in timeline
+            </span>
+            <span className={cn(
+              "inline-flex items-center h-5 px-1.5 rounded-full border text-[10.5px] font-semibold font-mono",
+              selectedJobs.length === allJobs.length
+                ? "bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400"
+                : "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-500 dark:text-slate-400"
+            )}>
+              {selectedJobs.length}/{allJobs.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 pb-1">
+            {selectedJobs.map((job) => (
+              <button
+                key={job}
+                onClick={() => toggleJob(job)}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500 transition-colors disabled:opacity-50"
+              >
+                <span
+                  className="w-1 h-3.5 rounded-sm shrink-0"
+                  style={{ backgroundColor: JOB_ROLE_COLOR[job] ?? '#94a3b8' }}
+                />
+                {job}
+                <span className="text-zinc-400 dark:text-slate-500 ml-0.5 leading-none">×</span>
+              </button>
+            ))}
+            {Array.from({ length: Math.max(0, allJobs.length - selectedJobs.length) }).map((_, i) => (
+              <span
+                key={`slot-${i}`}
+                className="inline-flex items-center justify-center h-7 px-3 rounded-md text-xs border border-dashed border-zinc-200 dark:border-slate-700 text-zinc-300 dark:text-slate-600 font-mono"
+              >
+                —
+              </span>
+            ))}
+          </div>
+          <div className="border-t border-zinc-200 dark:border-slate-700 -mx-4 mb-1" />
+          <p className="text-xs font-medium text-zinc-500 dark:text-slate-400 mb-1">Jobs</p>
           {JOB_GROUPS.map(({ label, jobs }) => (
             <div key={label} className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 dark:text-zinc-500 w-14 shrink-0">
+              <span className="text-xs text-zinc-400 dark:text-slate-500 w-14 shrink-0">
                 {label}
               </span>
               <div className="flex flex-wrap gap-1">
