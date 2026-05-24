@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { Plan } from "@/types/plan";
 import type { FflogsImportResult } from "@/types/fflogs";
+import type { MitigationAssignment } from "@/types/timeline";
 
 interface PlanState {
   _hasHydrated: boolean;
@@ -11,6 +12,8 @@ interface PlanState {
   mode: "edit" | "view";
   past: Plan[];
   future: Plan[];
+  comparisonAssignments: MitigationAssignment[] | null;
+  comparisonLabel: string | null;
 }
 
 interface PlanActions {
@@ -22,6 +25,7 @@ interface PlanActions {
   redo: () => void;
   setSelectedTimestamp: (ts: number | null) => void;
   setMode: (mode: "edit" | "view") => void;
+  setComparison: (assignments: MitigationAssignment[] | null, label: string | null) => void;
 }
 
 export const usePlanStore = create<PlanState & PlanActions>()(
@@ -34,6 +38,8 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       mode: "edit",
       past: [],
       future: [],
+      comparisonAssignments: null,
+      comparisonLabel: null,
 
       _setHasHydrated: (v) => set({ _hasHydrated: v }),
       setPlan: (plan) => set({ plan, past: [], future: [] }),
@@ -73,6 +79,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
 
       setSelectedTimestamp: (ts) => set({ selectedTimestamp: ts }),
       setMode: (mode) => set({ mode }),
+      setComparison: (assignments, label) => set({ comparisonAssignments: assignments, comparisonLabel: label }),
     }),
     {
       name: "ffxiv-raidwide-plan",

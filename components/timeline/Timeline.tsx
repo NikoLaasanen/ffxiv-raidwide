@@ -23,6 +23,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
 import { FavoriteButton } from "@/components/plan/FavoriteButton";
+import { CompareDialog } from "@/components/plan/CompareDialog";
+import { usePlanStore } from "@/store/plan-store";
 
 interface TimelineProps {
   timeline: TimelineRow[];
@@ -42,6 +44,7 @@ type CellState = {
   onCooldown: boolean;
   inDuration: boolean;
   cooldownTooltip: string;
+  compareState: "original-only" | "comparison-only" | "both" | "neither" | null;
 };
 
 type DisplayItem =
@@ -244,10 +247,11 @@ interface RowProps {
   onCycle: (bossAbility: string) => void;
   onAddPhase: (ts: number) => void;
   readOnly?: boolean;
+  isComparing: boolean;
 }
 
 const TimelineBodyRow = memo(
-  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle, onAddPhase, readOnly }: RowProps) {
+  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle, onAddPhase, readOnly, isComparing }: RowProps) {
     let cellIndex = 0;
 
     const deathPlayers = players.filter((p) => row.playerMistakes[p.id]?.dead);
@@ -363,6 +367,23 @@ const TimelineBodyRow = memo(
             <span className="text-zinc-300 dark:text-zinc-600">—</span>
           )}
         </td>
+        {isComparing && (() => {
+          const addedCount = cellStates.filter((cs) => cs.compareState === "original-only").length;
+          const removedCount = cellStates.filter((cs) => cs.compareState === "comparison-only").length;
+          return (
+            <td className="px-3 py-2 text-center font-mono text-xs whitespace-nowrap">
+              {addedCount === 0 && removedCount === 0 ? (
+                <span className="text-zinc-300 dark:text-zinc-600">—</span>
+              ) : (
+                <>
+                  {addedCount > 0 && <span className="text-green-600 dark:text-green-400">+{addedCount}</span>}
+                  {addedCount > 0 && removedCount > 0 && <span className="text-zinc-400 dark:text-zinc-500"> / </span>}
+                  {removedCount > 0 && <span className="text-red-500 dark:text-red-400">−{removedCount}</span>}
+                </>
+              )}
+            </td>
+          );
+        })()}
         {showDamageColumn && (
           <td className="px-4 py-2 text-right font-mono text-xs tabular-nums">
             {row.damageEvent != null ? (
@@ -429,7 +450,8 @@ const TimelineBodyRow = memo(
           return [
             mistakeCell,
             ...abilities.map((ab, i) => {
-            const { assigned, onCooldown, inDuration, cooldownTooltip } = cellStates[cellIndex++];
+            const { assigned, onCooldown, inDuration, cooldownTooltip, compareState } = cellStates[cellIndex++];
+            const showBadge = compareState === "original-only" || compareState === "comparison-only";
 
             const btn = (
               <button
@@ -444,11 +466,29 @@ const TimelineBodyRow = memo(
                     ? "bg-zinc-200 dark:bg-zinc-700 cursor-not-allowed opacity-50"
                     : inDuration
                     ? "border border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-500"
-                    : "border border-zinc-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500"
+                    : "border border-zinc-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500",
+                  compareState === "original-only" && "ring-2 ring-green-500 dark:ring-green-400",
+                  compareState === "comparison-only" && "ring-2 ring-red-500 dark:ring-red-400"
                 )}
                 aria-label={`Toggle ${ab.name}`}
               />
             );
+
+            const badge = showBadge ? (
+              <span
+                className={cn(
+                  "pointer-events-none absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full text-[8px] font-bold leading-none",
+                  compareState === "original-only" ? "bg-green-500 text-white" : "bg-red-500 text-white"
+                )}
+                aria-hidden
+              >
+                {compareState === "original-only" ? "+" : "−"}
+              </span>
+            ) : null;
+
+            const cellContent = badge ? (
+              <span className="relative inline-block">{btn}{badge}</span>
+            ) : btn;
 
             return (
               <td
@@ -461,11 +501,11 @@ const TimelineBodyRow = memo(
               >
                 {onCooldown ? (
                   <Tooltip>
-                    <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                    <TooltipTrigger asChild>{cellContent}</TooltipTrigger>
                     <TooltipContent>{cooldownTooltip}</TooltipContent>
                   </Tooltip>
                 ) : (
-                  btn
+                  cellContent
                 )}
               </td>
             );
@@ -490,6 +530,7 @@ const TimelineBodyRow = memo(
     prev.onCycle === next.onCycle &&
     prev.onAddPhase === next.onAddPhase &&
     prev.readOnly === next.readOnly &&
+    prev.isComparing === next.isComparing &&
     prev.mitigation.totalMitPercent === next.mitigation.totalMitPercent &&
     prev.mitigation.mitigatedDamage === next.mitigation.mitigatedDamage &&
     prev.cellStates.length === next.cellStates.length &&
@@ -498,7 +539,8 @@ const TimelineBodyRow = memo(
         c.assigned === next.cellStates[i].assigned &&
         c.onCooldown === next.cellStates[i].onCooldown &&
         c.inDuration === next.cellStates[i].inDuration &&
-        c.cooldownTooltip === next.cellStates[i].cooldownTooltip
+        c.cooldownTooltip === next.cellStates[i].cooldownTooltip &&
+        c.compareState === next.cellStates[i].compareState
     )
 );
 
@@ -603,10 +645,33 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
     return { worstMistakeByPlayer: worst, playerMistakeTimestamps: timestamps, playerStatusRanges: statusRanges };
   }, [timeline, players]);
 
+  const comparisonAssignments = usePlanStore((s) => s.comparisonAssignments);
+  const comparisonLabel = usePlanStore((s) => s.comparisonLabel);
+  const setComparison = usePlanStore((s) => s.setComparison);
+
+  // Clear comparison when navigating to a different plan
+  const prevViewLinkIdRef = useRef(viewLinkId);
+  useEffect(() => {
+    if (prevViewLinkIdRef.current !== viewLinkId) {
+      prevViewLinkIdRef.current = viewLinkId;
+      setComparison(null, null);
+    }
+  }, [viewLinkId, setComparison]);
+
   const assignedSet = useMemo(
     () => new Set(assignments.map((a) => `${a.playerId}|${a.abilityId}|${a.timestamp}`)),
     [assignments]
   );
+
+  const comparisonSet = useMemo(
+    () =>
+      comparisonAssignments
+        ? new Set(comparisonAssignments.map((a) => `${a.playerId}|${a.abilityId}|${a.timestamp}`))
+        : null,
+    [comparisonAssignments]
+  );
+
+  const isComparing = comparisonSet !== null;
 
   const assignmentsByPlayerAbility = useMemo(() => {
     const map = new Map<string, MitigationAssignment[]>();
@@ -704,13 +769,23 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
       selectedJobs.flatMap((job) => {
         const abilities = filteredAbilitiesByJob[job] ?? [];
         if (abilities.length === 0)
-          return [{ assigned: false, onCooldown: false, inDuration: false, cooldownTooltip: "" }];
+          return [{ assigned: false, onCooldown: false, inDuration: false, cooldownTooltip: "", compareState: null as CellState["compareState"] }];
         return abilities.map((ab) => {
           const player = playerByJob.get(job);
           const assigned = player
             ? assignedSet.has(`${player.id}|${ab.id}|${row.timestamp}`)
             : false;
           const ability = abilityLookup.get(`${job}|${ab.id}`);
+
+          const compareState: CellState["compareState"] = comparisonSet === null || !player
+            ? null
+            : (() => {
+                const inComp = comparisonSet.has(`${player.id}|${ab.id}|${row.timestamp}`);
+                if (assigned && inComp) return "both";
+                if (assigned) return "original-only";
+                if (inComp) return "comparison-only";
+                return "neither";
+              })();
 
           if (!assigned && player && ability) {
             const list = assignmentsByPlayerAbility.get(`${player.id}|${ab.id}`) ?? [];
@@ -720,7 +795,7 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
               const inDuration = list.some(
                 (a) => row.timestamp > a.timestamp && row.timestamp <= a.timestamp + durationMs - bufferMs
               );
-              if (inDuration) return { assigned: false, onCooldown: false, inDuration: true, cooldownTooltip: "" };
+              if (inDuration) return { assigned: false, onCooldown: false, inDuration: true, cooldownTooltip: "", compareState };
             }
             if (ability.cooldown > 0) {
               const cooldownMs = ability.cooldown * 1000;
@@ -733,16 +808,17 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
                   onCooldown: true,
                   inDuration: false,
                   cooldownTooltip: `On cooldown (expires at ${formatTimestamp(blocking.timestamp + cooldownMs)})`,
+                  compareState,
                 };
               }
             }
           }
 
-          return { assigned, onCooldown: false, inDuration: false, cooldownTooltip: "" };
+          return { assigned, onCooldown: false, inDuration: false, cooldownTooltip: "", compareState };
         });
       })
     ),
-    [assignedSet, assignmentsByPlayerAbility, abilityLookup, playerByJob, visibleRows, selectedJobs, filteredAbilitiesByJob, activationBuffer]
+    [assignedSet, comparisonSet, assignmentsByPlayerAbility, abilityLookup, playerByJob, visibleRows, selectedJobs, filteredAbilitiesByJob, activationBuffer]
   );
 
   const rowMitigations = useMemo(
@@ -762,6 +838,7 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
 
   const totalColCount = useMemo(() => {
     let count = 4 + (showMistakesColumn ? 1 : 0); // Time, Boss Ability, [Mistakes], Type, Mit%
+    if (isComparing) count++;
     if (showDamageColumn) count++;
     if (showSourceColumn) count++;
     if (showMechanicTypeColumn) count++;
@@ -772,7 +849,7 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
       count += (hasMistakes ? 1 : 0) + (abilities.length || 1);
     }
     return count;
-  }, [showDamageColumn, showSourceColumn, showMechanicTypeColumn, selectedJobs, filteredAbilitiesByJob, playerByJob, showMistakesColumn]);
+  }, [isComparing, showDamageColumn, showSourceColumn, showMechanicTypeColumn, selectedJobs, filteredAbilitiesByJob, playerByJob, showMistakesColumn]);
 
   const displayItems = useMemo((): DisplayItem[] => {
     const sortedPhases = [...localPhases].sort((a, b) => a.timestamp - b.timestamp);
@@ -840,8 +917,32 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
     <TooltipProvider>
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-end gap-2">
+          {readOnly && comparisonLabel && (
+            <div className="flex items-center gap-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-xs text-zinc-600 dark:text-zinc-400">
+              <span className="font-medium">Comparing:</span>
+              <span className="max-w-[12rem] truncate">{comparisonLabel}</span>
+              <button
+                onClick={() => setComparison(null, null)}
+                aria-label="Clear comparison"
+                className="leading-none text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+              >
+                ×
+              </button>
+            </div>
+          )}
           {viewLinkId && title !== undefined && (
             <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
+          )}
+          {readOnly && viewLinkId && (
+            <CompareDialog
+              originalPlayers={players}
+              originalTimeline={timeline}
+              originalTitle={title ?? ""}
+              abilitiesByJob={abilitiesByJob}
+              abilitiesLoading={isLoading}
+              onCompare={(a, label) => setComparison(a, label)}
+              onClear={() => setComparison(null, null)}
+            />
           )}
           <PreferencesDialog />
         </div>
@@ -862,6 +963,7 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
                 {showMistakesColumn && <th rowSpan={2} className={`${TH_BASE} w-20`}>Mistakes</th>}
                 <th rowSpan={2} className={`${TH_FIXED} w-28`}>Type</th>
                 <th rowSpan={2} className={`${TH_BASE} text-right w-16`}>Mit%</th>
+                {isComparing && <th rowSpan={2} className={`${TH_BASE} w-16`}>Diff</th>}
                 {showDamageColumn && (
                   <th rowSpan={2} className={`${TH_FIXED} text-right w-28`}>Damage</th>
                 )}
@@ -999,6 +1101,7 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
                     onCycle={stableCycle}
                     onAddPhase={stableAddPhase}
                     readOnly={readOnly}
+                    isComparing={isComparing}
                   />
                 );
               })}
