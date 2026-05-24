@@ -8,6 +8,7 @@ import { Timeline } from "@/components/timeline/Timeline";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { savePlan } from "@/lib/plan-service";
 import type { MitigationAssignment } from "@/types/timeline";
+import type { PhaseDivider } from "@/types/player";
 
 export default function NewPlanPage() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function NewPlanPage() {
   const [saving, setSaving] = useState(false);
   const [currentAssignments, setCurrentAssignments] = useState<MitigationAssignment[]>([]);
   const handleAssignmentsChange = useCallback((a: MitigationAssignment[]) => setCurrentAssignments(a), []);
+  const [currentPhases, setCurrentPhases] = useState<PhaseDivider[]>([]);
+  const handlePhasesChange = useCallback((p: PhaseDivider[]) => setCurrentPhases(p), []);
   const hasSaved = useRef(false);
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export default function NewPlanPage() {
         raidplanLink: fflogsUrl,
         timeline,
         players,
-        phases: [],
+        phases: currentPhases,
         assignments: currentAssignments,
         createdAt: now,
         updatedAt: now,
@@ -83,7 +86,7 @@ export default function NewPlanPage() {
         </p>
       </div>
 
-      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} onAssignmentsChange={handleAssignmentsChange} />
+      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} onAssignmentsChange={handleAssignmentsChange} onPhasesChange={handlePhasesChange} />
 
       <div className="mt-6 flex items-center gap-3">
         <Button onClick={handleSave} disabled={saving}>
