@@ -3,7 +3,8 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, memo } from "react";
 import type { TimelineRow, MitigationAssignment, MechanicType, PlayerMistakeState } from "@/types/timeline";
 import type { DamageType } from "@/types/common";
-import type { Player } from "@/types/player";
+import type { Player, PhaseDivider } from "@/types/player";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { PlayerCastEvent } from "@/types/fflogs";
@@ -24,6 +25,7 @@ interface TimelineProps {
   timeline: TimelineRow[];
   players: Player[];
   casts?: PlayerCastEvent[];
+  phases?: PhaseDivider[];
 }
 
 type CellState = {
@@ -32,6 +34,10 @@ type CellState = {
   inDuration: boolean;
   cooldownTooltip: string;
 };
+
+type DisplayItem =
+  | { kind: "phase"; phase: PhaseDivider; endTimestamp: number }
+  | { kind: "row"; row: TimelineRow; rowIndex: number };
 
 const TYPE_CYCLE: DamageType[] = ["magical", "physical", "unique"];
 
@@ -135,6 +141,78 @@ function MistakeCell({ mistakes }: { mistakes?: PlayerMistakeState }) {
   );
 }
 
+function PhaseDividerRow({
+  phase,
+  endTimestamp,
+  colCount,
+  onToggle,
+  onRename,
+  onRemove,
+}: {
+  phase: PhaseDivider;
+  endTimestamp: number;
+  colCount: number;
+  onToggle: (ts: number) => void;
+  onRename: (ts: number, name: string) => void;
+  onRemove: (ts: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(phase.name);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed) onRename(phase.timestamp, trimmed);
+    else setDraft(phase.name);
+  }
+
+  return (
+    <tr className="bg-zinc-100/80 dark:bg-zinc-800/60 border-y border-zinc-200 dark:border-zinc-700">
+      <td colSpan={colCount} className="px-3 py-1.5">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onToggle(phase.timestamp)}
+            className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors shrink-0"
+            aria-label={phase.collapsed ? "Expand phase" : "Collapse phase"}
+          >
+            {phase.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          </button>
+          {editing ? (
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commit();
+                if (e.key === "Escape") { setEditing(false); setDraft(phase.name); }
+              }}
+              className="text-sm font-medium bg-transparent border-b border-zinc-400 dark:border-zinc-500 outline-none px-0.5 w-32 min-w-0"
+            />
+          ) : (
+            <span
+              className="text-sm font-medium cursor-text hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              onClick={() => { setEditing(true); setDraft(phase.name); }}
+            >
+              {phase.name}
+            </span>
+          )}
+          <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono">
+            {formatTimestamp(phase.timestamp)} – {formatTimestamp(endTimestamp)}
+          </span>
+          <button
+            onClick={() => onRemove(phase.timestamp)}
+            className="ml-auto text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors text-base leading-none px-1"
+            aria-label="Remove phase divider"
+          >
+            ×
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 interface RowProps {
   row: TimelineRow;
   index: number;
@@ -151,10 +229,11 @@ interface RowProps {
   playerStatusRanges: Map<string, PlayerRanges>;
   onToggle: (timestamp: number, job: JobAbbreviation, abilityId: string) => void;
   onCycle: (bossAbility: string) => void;
+  onAddPhase: (ts: number) => void;
 }
 
 const TimelineBodyRow = memo(
-  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle }: RowProps) {
+  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle, onAddPhase }: RowProps) {
     let cellIndex = 0;
 
     const deathPlayers = players.filter((p) => row.playerMistakes[p.id]?.dead);
@@ -168,54 +247,63 @@ const TimelineBodyRow = memo(
           index % 2 === 0 ? "bg-white dark:bg-zinc-950" : "bg-zinc-50/50 dark:bg-zinc-900/50"
         )}
       >
-        <td className="px-4 py-2 font-mono text-xs text-zinc-500 dark:text-zinc-400">
+        <td className="px-4 py-2 font-mono text-xs text-zinc-500 dark:text-zinc-400 relative">
           {formatTimestamp(row.timestamp)}
+          <button
+            onClick={() => onAddPhase(row.timestamp)}
+            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 w-4 h-4 rounded flex items-center justify-center text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all text-[10px] leading-none"
+            aria-label="Add phase divider here"
+          >
+            +
+          </button>
         </td>
         <td className="px-4 py-2 font-medium">{row.bossAbility}</td>
-        <td className="px-3 py-2 text-center">
-          {hasMistakeSummary ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" className="inline-flex items-center gap-1 cursor-default focus:outline-none mx-auto">
+        {showMistakesColumn && (
+          <td className="px-3 py-2 text-center">
+            {hasMistakeSummary ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="inline-flex items-center gap-1 cursor-default focus:outline-none mx-auto">
+                    {deathPlayers.length > 0 && (
+                      <span className="inline-flex items-center gap-0.5">
+                        <Image src="/icons/Death.png" alt="Deaths" width={14} height={14} />
+                        {deathPlayers.length > 1 && <span className="text-[10px] font-medium text-zinc-500">×{deathPlayers.length}</span>}
+                      </span>
+                    )}
+                    {ddPlayers.length > 0 && (
+                      <span className="inline-flex items-center gap-0.5">
+                        <Image src="/icons/DamageDown.png" alt="Damage Downs" width={14} height={14} />
+                        {ddPlayers.length > 1 && <span className="text-[10px] font-medium text-zinc-500">×{ddPlayers.length}</span>}
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs space-y-0.5">
                   {deathPlayers.length > 0 && (
-                    <span className="inline-flex items-center gap-0.5">
-                      <Image src="/icons/Death.png" alt="Deaths" width={14} height={14} />
-                      {deathPlayers.length > 1 && <span className="text-[10px] font-medium text-zinc-500">×{deathPlayers.length}</span>}
-                    </span>
+                    <div>
+                      <span className="font-medium">Deaths: </span>
+                      {deathPlayers
+                        .map((p) => row.playerMistakes[p.id].deathTimestamp != null ? `${formatTimestamp(row.playerMistakes[p.id].deathTimestamp!)} (${p.job})` : null)
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>
                   )}
                   {ddPlayers.length > 0 && (
-                    <span className="inline-flex items-center gap-0.5">
-                      <Image src="/icons/DamageDown.png" alt="Damage Downs" width={14} height={14} />
-                      {ddPlayers.length > 1 && <span className="text-[10px] font-medium text-zinc-500">×{ddPlayers.length}</span>}
-                    </span>
+                    <div>
+                      <span className="font-medium">Damage Downs: </span>
+                      {ddPlayers
+                        .map((p) => row.playerMistakes[p.id].damageDownTimestamp != null ? `${formatTimestamp(row.playerMistakes[p.id].damageDownTimestamp!)} (${p.job})` : null)
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>
                   )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="text-xs space-y-0.5">
-                {deathPlayers.length > 0 && (
-                  <div>
-                    <span className="font-medium">Deaths: </span>
-                    {deathPlayers
-                      .map((p) => row.playerMistakes[p.id].deathTimestamp != null ? `${formatTimestamp(row.playerMistakes[p.id].deathTimestamp!)} (${p.job})` : null)
-                      .filter(Boolean)
-                      .join(", ")}
-                  </div>
-                )}
-                {ddPlayers.length > 0 && (
-                  <div>
-                    <span className="font-medium">Damage Downs: </span>
-                    {ddPlayers
-                      .map((p) => row.playerMistakes[p.id].damageDownTimestamp != null ? `${formatTimestamp(row.playerMistakes[p.id].damageDownTimestamp!)} (${p.job})` : null)
-                      .filter(Boolean)
-                      .join(", ")}
-                  </div>
-                )}
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <span className="text-zinc-300 dark:text-zinc-600">—</span>
-          )}
-        </td>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="text-zinc-300 dark:text-zinc-600">—</span>
+            )}
+          </td>
+        )}
         <td className="px-4 py-2">
           {row.damageEvent ? (
             <Tooltip>
@@ -371,6 +459,7 @@ const TimelineBodyRow = memo(
     prev.playerStatusRanges === next.playerStatusRanges &&
     prev.onToggle === next.onToggle &&
     prev.onCycle === next.onCycle &&
+    prev.onAddPhase === next.onAddPhase &&
     prev.mitigation.totalMitPercent === next.mitigation.totalMitPercent &&
     prev.mitigation.mitigatedDamage === next.mitigation.mitigatedDamage &&
     prev.cellStates.length === next.cellStates.length &&
@@ -383,7 +472,7 @@ const TimelineBodyRow = memo(
     )
 );
 
-export function Timeline({ timeline, players, casts }: TimelineProps) {
+export function Timeline({ timeline, players, casts, phases = [] }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -412,6 +501,24 @@ export function Timeline({ timeline, players, casts }: TimelineProps) {
     setLocalTimeline(timeline);
   }
   const initializedRef = useRef(false);
+
+  const [localPhases, setLocalPhases] = useState<PhaseDivider[]>(phases);
+
+  function addPhase(atTimestamp: number) {
+    setLocalPhases((prev) => {
+      if (prev.some((p) => p.timestamp === atTimestamp)) return prev;
+      return [...prev, { timestamp: atTimestamp, name: `Phase ${prev.length + 1}`, collapsed: false }];
+    });
+  }
+  function togglePhase(timestamp: number) {
+    setLocalPhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, collapsed: !p.collapsed } : p));
+  }
+  function renamePhase(timestamp: number, name: string) {
+    setLocalPhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, name } : p));
+  }
+  function removePhase(timestamp: number) {
+    setLocalPhases((prev) => prev.filter((p) => p.timestamp !== timestamp));
+  }
 
   const playerByJob = useMemo(
     () => new Map(players.map((p) => [p.job, p])),
@@ -628,6 +735,51 @@ export function Timeline({ timeline, players, casts }: TimelineProps) {
     [visibleRows, allJobs, abilitiesByJob, playerByJob, assignmentsByPlayerAbility]
   );
 
+  const totalColCount = useMemo(() => {
+    let count = 4 + (showMistakesColumn ? 1 : 0); // Time, Boss Ability, [Mistakes], Type, Mit%
+    if (showDamageColumn) count++;
+    if (showSourceColumn) count++;
+    if (showMechanicTypeColumn) count++;
+    for (const job of selectedJobs) {
+      const abilities = filteredAbilitiesByJob[job] ?? [];
+      const player = playerByJob.get(job);
+      const hasMistakes = showMistakesColumn && (player?.mistakeColumnsEnabled ?? false);
+      count += (hasMistakes ? 1 : 0) + (abilities.length || 1);
+    }
+    return count;
+  }, [showDamageColumn, showSourceColumn, showMechanicTypeColumn, selectedJobs, filteredAbilitiesByJob, playerByJob, showMistakesColumn]);
+
+  const displayItems = useMemo((): DisplayItem[] => {
+    const sortedPhases = [...localPhases].sort((a, b) => a.timestamp - b.timestamp);
+    const phaseEndTimestamps = sortedPhases.map((ph, idx) => {
+      const nextTs = sortedPhases[idx + 1]?.timestamp ?? Infinity;
+      let end = ph.timestamp;
+      for (const r of visibleRows) {
+        if (r.timestamp < nextTs) end = r.timestamp;
+      }
+      return end;
+    });
+
+    const items: DisplayItem[] = [];
+    let phaseIdx = 0;
+    let collapsing = false;
+
+    for (let i = 0; i < visibleRows.length; i++) {
+      const row = visibleRows[i];
+      while (phaseIdx < sortedPhases.length && sortedPhases[phaseIdx].timestamp <= row.timestamp) {
+        items.push({ kind: "phase", phase: sortedPhases[phaseIdx], endTimestamp: phaseEndTimestamps[phaseIdx] });
+        collapsing = sortedPhases[phaseIdx].collapsed;
+        phaseIdx++;
+      }
+      if (!collapsing) items.push({ kind: "row", row, rowIndex: i });
+    }
+    while (phaseIdx < sortedPhases.length) {
+      items.push({ kind: "phase", phase: sortedPhases[phaseIdx], endTimestamp: phaseEndTimestamps[phaseIdx] });
+      phaseIdx++;
+    }
+    return items;
+  }, [visibleRows, localPhases]);
+
   // Stable refs so memoized rows never see new function props on unrelated re-renders
   const cycleRef = useRef(cycleDamageType);
   const stableCycle = useCallback((bossAbility: string) => cycleRef.current(bossAbility), []);
@@ -638,9 +790,13 @@ export function Timeline({ timeline, players, casts }: TimelineProps) {
     []
   );
 
+  const addPhaseRef = useRef(addPhase);
+  const stableAddPhase = useCallback((ts: number) => addPhaseRef.current(ts), []);
+
   useLayoutEffect(() => {
     cycleRef.current = cycleDamageType;
     toggleRef.current = toggleAssignment;
+    addPhaseRef.current = addPhase;
   });
 
   return (
@@ -663,7 +819,7 @@ export function Timeline({ timeline, players, casts }: TimelineProps) {
               <tr>
                 <th rowSpan={2} className={`${TH_FIXED} w-20`}>Time</th>
                 <th rowSpan={2} className={TH_FIXED}>Boss Ability</th>
-                <th rowSpan={2} className={`${TH_BASE} w-20`}>Mistakes</th>
+                {showMistakesColumn && <th rowSpan={2} className={`${TH_BASE} w-20`}>Mistakes</th>}
                 <th rowSpan={2} className={`${TH_FIXED} w-28`}>Type</th>
                 <th rowSpan={2} className={`${TH_BASE} text-right w-16`}>Mit%</th>
                 {showDamageColumn && (
@@ -767,26 +923,39 @@ export function Timeline({ timeline, players, casts }: TimelineProps) {
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map((row, index) => (
-                <TimelineBodyRow
-                  key={`${row.timestamp}-${row.bossAbility}-${index}`}
-                  row={row}
-                  index={index}
-                  players={players}
-                  selectedJobs={selectedJobs}
-                  abilitiesByJob={filteredAbilitiesByJob}
-                  cellStates={rowCellStates[index]}
-                  mitigation={rowMitigations[index]}
-                  playerByJob={playerByJob}
-                  showDamageColumn={showDamageColumn}
-                  showSourceColumn={showSourceColumn}
-                  showMechanicTypeColumn={showMechanicTypeColumn}
-                  showMistakesColumn={showMistakesColumn}
-                  playerStatusRanges={playerStatusRanges}
-                  onToggle={stableToggle}
-                  onCycle={stableCycle}
-                />
-              ))}
+              {displayItems.map((item) =>
+                item.kind === "phase" ? (
+                  <PhaseDividerRow
+                    key={`phase-${item.phase.timestamp}`}
+                    phase={item.phase}
+                    endTimestamp={item.endTimestamp}
+                    colCount={totalColCount}
+                    onToggle={togglePhase}
+                    onRename={renamePhase}
+                    onRemove={removePhase}
+                  />
+                ) : (
+                  <TimelineBodyRow
+                    key={`${item.row.timestamp}-${item.row.bossAbility}-${item.rowIndex}`}
+                    row={item.row}
+                    index={item.rowIndex}
+                    players={players}
+                    selectedJobs={selectedJobs}
+                    abilitiesByJob={filteredAbilitiesByJob}
+                    cellStates={rowCellStates[item.rowIndex]}
+                    mitigation={rowMitigations[item.rowIndex]}
+                    playerByJob={playerByJob}
+                    showDamageColumn={showDamageColumn}
+                    showSourceColumn={showSourceColumn}
+                    showMechanicTypeColumn={showMechanicTypeColumn}
+                    showMistakesColumn={showMistakesColumn}
+                    playerStatusRanges={playerStatusRanges}
+                    onToggle={stableToggle}
+                    onCycle={stableCycle}
+                    onAddPhase={stableAddPhase}
+                  />
+                )
+              )}
             </tbody>
           </table>
         </div>

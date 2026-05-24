@@ -19,8 +19,6 @@ Plan documents. Created when a user saves a plan for the first time.
 | `timeline` | `TimelineRow[]` | Ordered list of boss ability rows |
 | `players` | `Player[]` | Players with their assigned abilities |
 | `phases` | `PhaseDivider[]` | Phase divider rows |
-| `settings` | `PlanSettings` | Plan-level settings (hide autos, etc.) |
-| `versionHistory` | `VersionEvent[]` | Snapshot history |
 | `createdAt` | `number` | Unix ms |
 | `updatedAt` | `number` | Unix ms |
 | `editLinkId` | `string` | UUID for edit access |

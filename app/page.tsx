@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { useFflogsImport, parseFflogsUrl } from "@/hooks/use-fflogs-import";
 import { usePlanStore } from "@/store/plan-store";
+import { formatTimestamp } from "@/lib/format-timestamp";
 
 export default function HomePage() {
   const [url, setUrl] = useState("");
@@ -20,6 +21,8 @@ export default function HomePage() {
   const { mutate, isPending, error } = useFflogsImport();
   const router = useRouter();
   const setPendingImport = usePlanStore((s) => s.setPendingImport);
+  const pendingImport = usePlanStore((s) => s.pendingImport);
+  const hasHydrated = usePlanStore((s) => s._hasHydrated);
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -54,7 +57,26 @@ export default function HomePage() {
         Import a fight from FFLogs, browse encounter presets, or create a new mitigation plan.
       </p>
 
-      <Card className="mt-8 max-w-xl">
+      {hasHydrated && pendingImport && (
+        <Card className="mt-6 max-w-xl border-zinc-700">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Unsaved plan in progress</CardTitle>
+            <CardDescription>
+              {pendingImport.fight.name} &middot; {formatTimestamp(pendingImport.fight.endTime - pendingImport.fight.startTime)} &middot; {pendingImport.players.length} players
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex gap-2">
+            <Button size="sm" onClick={() => router.push("/plan/new")}>
+              Continue
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setPendingImport(null)}>
+              Discard
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="mt-6 max-w-xl">
         <CardHeader>
           <CardTitle>Import from FFLogs</CardTitle>
           <CardDescription>Paste a FFLogs report URL to import fight data</CardDescription>

@@ -457,7 +457,7 @@ export async function POST(request: Request): Promise<Response> {
         timestamp: e.timestamp - fight.startTime,
       }));
 
-    return Response.json({ fight, players, timeline, casts });
+    return Response.json({ reportCode, fight, players, timeline, casts });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return Response.json({ error: message }, { status: 500 });

@@ -75,6 +75,7 @@ export interface PlayerCastEvent {
 }
 
 export interface FflogsImportResult {
+  reportCode: string;
   fight: FFLogsFight;
   players: Player[];
   timeline: TimelineRow[];

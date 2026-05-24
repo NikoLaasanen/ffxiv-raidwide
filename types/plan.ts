@@ -10,12 +10,6 @@ export interface PlanSettings {
   defaultDamageType: DamageType;
 }
 
-export interface VersionEvent {
-  timestamp: number;
-  description: string;
-  snapshot?: Plan;
-}
-
 export interface Plan {
   id: string;
   title: string;
@@ -24,8 +18,6 @@ export interface Plan {
   timeline: TimelineRow[];
   players: Player[];
   phases: PhaseDivider[];
-  settings: PlanSettings;
-  versionHistory: VersionEvent[];
   createdAt: number;
   updatedAt: number;
   editLinkId: string;
