@@ -1,6 +1,6 @@
 import type { DamageType } from "@/types/common";
 import type { Player, PhaseDivider } from "@/types/player";
-import type { TimelineRow } from "@/types/timeline";
+import type { TimelineRow, MitigationAssignment } from "@/types/timeline";
 
 export type { DamageType };
 
@@ -18,6 +18,7 @@ export interface Plan {
   timeline: TimelineRow[];
   players: Player[];
   phases: PhaseDivider[];
+  assignments?: MitigationAssignment[];
   createdAt: number;
   updatedAt: number;
   editLinkId: string;

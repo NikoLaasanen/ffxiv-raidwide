@@ -10,6 +10,8 @@ Plan documents. Created when a user saves a plan for the first time.
 
 **Document ID:** `{editLinkId}` (UUID, used as the edit link)
 
+**Querying by view link:** `where("viewLinkId", "==", viewLinkId)` — used by `getPlanByViewLink()` in `lib/plan-service.ts` to load a plan from `/plan/view/[id]`.
+
 | Field | Type | Description |
 |---|---|---|
 | `id` | `string` | Same as document ID |

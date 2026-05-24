@@ -22,12 +22,19 @@ import { usePreferencesStore } from "@/store/preferences-store";
 import { useShallow } from "zustand/react/shallow";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
+import { FavoriteButton } from "@/components/plan/FavoriteButton";
 
 interface TimelineProps {
   timeline: TimelineRow[];
   players: Player[];
   casts?: PlayerCastEvent[];
   phases?: PhaseDivider[];
+  initialAssignments?: MitigationAssignment[];
+  onAssignmentsChange?: (a: MitigationAssignment[]) => void;
+  readOnly?: boolean;
+  viewLinkId?: string;
+  title?: string;
+  encounterId?: string | null;
 }
 
 type CellState = {
@@ -150,6 +157,7 @@ const PhaseDividerRow = memo(function PhaseDividerRow({
   onToggle,
   onRename,
   onRemove,
+  readOnly,
 }: {
   phase: PhaseDivider;
   endTimestamp: number;
@@ -157,6 +165,7 @@ const PhaseDividerRow = memo(function PhaseDividerRow({
   onToggle: (ts: number) => void;
   onRename: (ts: number, name: string) => void;
   onRemove: (ts: number) => void;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(phase.name);
@@ -179,7 +188,7 @@ const PhaseDividerRow = memo(function PhaseDividerRow({
           >
             {phase.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
           </button>
-          {editing ? (
+          {!readOnly && editing ? (
             <input
               autoFocus
               value={draft}
@@ -193,8 +202,8 @@ const PhaseDividerRow = memo(function PhaseDividerRow({
             />
           ) : (
             <span
-              className="text-sm font-medium cursor-text hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              onClick={() => { setEditing(true); setDraft(phase.name); }}
+              className={cn("text-sm font-medium", !readOnly && "cursor-text hover:text-blue-600 dark:hover:text-blue-400 transition-colors")}
+              onClick={readOnly ? undefined : () => { setEditing(true); setDraft(phase.name); }}
             >
               {phase.name}
             </span>
@@ -202,13 +211,15 @@ const PhaseDividerRow = memo(function PhaseDividerRow({
           <span className="text-xs text-zinc-400 dark:text-zinc-500 font-mono">
             {formatTimestamp(phase.timestamp)} – {formatTimestamp(endTimestamp)}
           </span>
-          <button
-            onClick={() => onRemove(phase.timestamp)}
-            className="ml-auto text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors text-base leading-none px-1"
-            aria-label="Remove phase divider"
-          >
-            ×
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => onRemove(phase.timestamp)}
+              className="ml-auto text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors text-base leading-none px-1"
+              aria-label="Remove phase divider"
+            >
+              ×
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -232,10 +243,11 @@ interface RowProps {
   onToggle: (timestamp: number, job: JobAbbreviation, abilityId: string) => void;
   onCycle: (bossAbility: string) => void;
   onAddPhase: (ts: number) => void;
+  readOnly?: boolean;
 }
 
 const TimelineBodyRow = memo(
-  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle, onAddPhase }: RowProps) {
+  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle, onAddPhase, readOnly }: RowProps) {
     let cellIndex = 0;
 
     const deathPlayers = players.filter((p) => row.playerMistakes[p.id]?.dead);
@@ -251,13 +263,15 @@ const TimelineBodyRow = memo(
       >
         <td className="px-4 py-2 font-mono text-xs text-zinc-500 dark:text-zinc-400 relative">
           {formatTimestamp(row.timestamp)}
-          <button
-            onClick={() => onAddPhase(row.timestamp)}
-            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 w-4 h-4 rounded flex items-center justify-center text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all text-[10px] leading-none"
-            aria-label="Add phase divider here"
-          >
-            +
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => onAddPhase(row.timestamp)}
+              className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/row:opacity-100 w-4 h-4 rounded flex items-center justify-center text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all text-[10px] leading-none"
+              aria-label="Add phase divider here"
+            >
+              +
+            </button>
+          )}
         </td>
         <td className="px-4 py-2 font-medium">{row.bossAbility}</td>
         {showMistakesColumn && (
@@ -310,18 +324,29 @@ const TimelineBodyRow = memo(
           {row.damageEvent ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  onClick={() => onCycle(row.bossAbility)}
-                  className="block rounded p-0.5 hover:ring-2 hover:ring-zinc-300 dark:hover:ring-zinc-600 transition-shadow"
-                  aria-label={`Damage type: ${row.damageEvent.type}. Click to cycle.`}
-                >
-                  <Image
-                    src={DAMAGE_TYPE_ICON[row.damageEvent.type]}
-                    alt={row.damageEvent.type}
-                    width={24}
-                    height={24}
-                  />
-                </button>
+                {readOnly ? (
+                  <div className="block rounded p-0.5">
+                    <Image
+                      src={DAMAGE_TYPE_ICON[row.damageEvent.type]}
+                      alt={row.damageEvent.type}
+                      width={24}
+                      height={24}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => onCycle(row.bossAbility)}
+                    className="block rounded p-0.5 hover:ring-2 hover:ring-zinc-300 dark:hover:ring-zinc-600 transition-shadow"
+                    aria-label={`Damage type: ${row.damageEvent.type}. Click to cycle.`}
+                  >
+                    <Image
+                      src={DAMAGE_TYPE_ICON[row.damageEvent.type]}
+                      alt={row.damageEvent.type}
+                      width={24}
+                      height={24}
+                    />
+                  </button>
+                )}
               </TooltipTrigger>
               <TooltipContent side="right" className="capitalize">
                 {row.damageEvent.type}
@@ -408,9 +433,11 @@ const TimelineBodyRow = memo(
 
             const btn = (
               <button
-                onClick={() => onToggle(row.timestamp, job, ab.id)}
+                onClick={readOnly ? undefined : () => onToggle(row.timestamp, job, ab.id)}
+                disabled={readOnly}
                 className={cn(
                   "w-5 h-5 rounded mx-auto block transition-colors",
+                  readOnly && "cursor-default pointer-events-none",
                   assigned
                     ? "bg-blue-500 dark:bg-blue-400"
                     : onCooldown
@@ -462,6 +489,7 @@ const TimelineBodyRow = memo(
     prev.onToggle === next.onToggle &&
     prev.onCycle === next.onCycle &&
     prev.onAddPhase === next.onAddPhase &&
+    prev.readOnly === next.readOnly &&
     prev.mitigation.totalMitPercent === next.mitigation.totalMitPercent &&
     prev.mitigation.mitigatedDamage === next.mitigation.mitigatedDamage &&
     prev.cellStates.length === next.cellStates.length &&
@@ -474,7 +502,7 @@ const TimelineBodyRow = memo(
     )
 );
 
-export function Timeline({ timeline, players, casts, phases = [] }: TimelineProps) {
+export function Timeline({ timeline, players, casts, phases = [], initialAssignments, onAssignmentsChange, readOnly, viewLinkId, title, encounterId }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -506,14 +534,19 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
   );
   const [selectedJobs, setSelectedJobs] = useState<JobAbbreviation[]>(() => allJobs);
   const { abilitiesByJob, isLoading } = useJobAbilities(allJobs);
-  const [assignments, setAssignments] = useState<MitigationAssignment[]>([]);
+  const initializedRef = useRef(!!initialAssignments?.length);
+  const [assignments, setAssignments] = useState<MitigationAssignment[]>(
+    () => initialAssignments ?? []
+  );
+  const onAssignmentsChangeRef = useRef(onAssignmentsChange);
+  useLayoutEffect(() => { onAssignmentsChangeRef.current = onAssignmentsChange; });
+  useEffect(() => { onAssignmentsChangeRef.current?.(assignments); }, [assignments]);
   const [localTimeline, setLocalTimeline] = useState<TimelineRow[]>(timeline);
   const [prevTimeline, setPrevTimeline] = useState<TimelineRow[]>(timeline);
   if (prevTimeline !== timeline) {
     setPrevTimeline(timeline);
     setLocalTimeline(timeline);
   }
-  const initializedRef = useRef(false);
 
   const [localPhases, setLocalPhases] = useState<PhaseDivider[]>(phases);
 
@@ -807,6 +840,9 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
     <TooltipProvider>
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-end gap-2">
+          {viewLinkId && title !== undefined && (
+            <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
+          )}
           <PreferencesDialog />
         </div>
         <div ref={scrollContainerRef} className="relative overflow-auto max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-zinc-800">
@@ -941,6 +977,7 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
                     onToggle={stableTogglePhase}
                     onRename={stableRenamePhase}
                     onRemove={stableRemovePhase}
+                    readOnly={readOnly}
                   />
                 ) : (
                   <TimelineBodyRow
@@ -961,6 +998,7 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
                     onToggle={stableToggle}
                     onCycle={stableCycle}
                     onAddPhase={stableAddPhase}
+                    readOnly={readOnly}
                   />
                 );
               })}
@@ -971,7 +1009,7 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
           </table>
         </div>
 
-        <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+        {!readOnly && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Jobs</p>
           {JOB_GROUPS.map(({ label, jobs }) => (
             <div key={label} className="flex items-center gap-2">
@@ -994,7 +1032,7 @@ export function Timeline({ timeline, players, casts, phases = [] }: TimelineProp
               </div>
             </div>
           ))}
-        </div>
+        </div>}
       </div>
     </TooltipProvider>
   );

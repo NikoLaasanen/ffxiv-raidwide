@@ -1,15 +1,12 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { usePlanStore } from "@/store/plan-store";
-import { getPlan, updatePlan } from "@/lib/plan-service";
+import { getPlanByViewLink } from "@/lib/plan-service";
 import { Timeline } from "@/components/timeline/Timeline";
-import { Button } from "@/components/ui/button";
 import { formatTimestamp } from "@/lib/format-timestamp";
-import type { Plan } from "@/types/plan";
-import type { MitigationAssignment } from "@/types/timeline";
 
-export default function PlanPage({
+export default function PlanViewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -22,19 +19,14 @@ export default function PlanPage({
 
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [currentAssignments, setCurrentAssignments] = useState<MitigationAssignment[]>([]);
-  const handleAssignmentsChange = useCallback((a: MitigationAssignment[]) => setCurrentAssignments(a), []);
 
-  // Load plan from Firebase if the store doesn't already have it
   useEffect(() => {
     if (!hasHydrated) return;
-    if (storePlan?.editLinkId === id) return;
+    if (storePlan?.viewLinkId === id) return;
 
     setLoading(true);
     setNotFound(false);
-    getPlan(id)
+    getPlanByViewLink(id)
       .then((plan) => {
         if (!plan) {
           setNotFound(true);
@@ -44,23 +36,7 @@ export default function PlanPage({
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [hasHydrated, id, storePlan?.editLinkId, setPlan]);
-
-  async function handleSave() {
-    if (!storePlan) return;
-    setSaving(true);
-    setSaved(false);
-    try {
-      const updated: Plan = { ...storePlan, updatedAt: Date.now(), assignments: currentAssignments };
-      await updatePlan(updated);
-      setPlan(updated);
-      setSaved(true);
-    } catch (err) {
-      console.error("Failed to save plan:", err);
-    } finally {
-      setSaving(false);
-    }
-  }
+  }, [hasHydrated, id, storePlan?.viewLinkId, setPlan]);
 
   if (!hasHydrated || loading) {
     return (
@@ -78,7 +54,7 @@ export default function PlanPage({
       <main className="p-8">
         <h1 className="text-2xl font-bold">Plan not found</h1>
         <p className="mt-2 text-sm text-zinc-500">
-          The edit link may be invalid or the plan was deleted.
+          The view link may be invalid or the plan was deleted.
         </p>
       </main>
     );
@@ -116,20 +92,11 @@ export default function PlanPage({
         players={storePlan.players}
         phases={storePlan.phases}
         initialAssignments={storePlan.assignments ?? []}
-        onAssignmentsChange={handleAssignmentsChange}
+        readOnly
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}
       />
-
-      <div className="mt-6 flex items-center gap-3">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Plan"}
-        </Button>
-        {saved && (
-          <span className="text-sm text-green-500">Saved</span>
-        )}
-      </div>
     </main>
   );
 }

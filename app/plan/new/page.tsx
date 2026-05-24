@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
 import { Button } from "@/components/ui/button";
 import { Timeline } from "@/components/timeline/Timeline";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { savePlan } from "@/lib/plan-service";
+import type { MitigationAssignment } from "@/types/timeline";
 
 export default function NewPlanPage() {
   const router = useRouter();
@@ -15,9 +16,12 @@ export default function NewPlanPage() {
   const setPlan = usePlanStore((s) => s.setPlan);
   const setPendingImport = usePlanStore((s) => s.setPendingImport);
   const [saving, setSaving] = useState(false);
+  const [currentAssignments, setCurrentAssignments] = useState<MitigationAssignment[]>([]);
+  const handleAssignmentsChange = useCallback((a: MitigationAssignment[]) => setCurrentAssignments(a), []);
+  const hasSaved = useRef(false);
 
   useEffect(() => {
-    if (hasHydrated && pendingImport === null) {
+    if (hasHydrated && pendingImport === null && !hasSaved.current) {
       router.replace("/");
     }
   }, [hasHydrated, pendingImport, router]);
@@ -45,11 +49,13 @@ export default function NewPlanPage() {
         timeline,
         players,
         phases: [],
+        assignments: currentAssignments,
         createdAt: now,
         updatedAt: now,
       };
       await savePlan(plan);
       setPlan(plan);
+      hasSaved.current = true;
       setPendingImport(null);
       router.push(`/plan/${editLinkId}`);
     } catch (err) {
@@ -77,7 +83,7 @@ export default function NewPlanPage() {
         </p>
       </div>
 
-      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} />
+      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} onAssignmentsChange={handleAssignmentsChange} />
 
       <div className="mt-6 flex items-center gap-3">
         <Button onClick={handleSave} disabled={saving}>

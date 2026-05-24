@@ -60,7 +60,25 @@ The app is designed to be usable without authentication, with optional cloud fea
 - Create new empty plan
 - Optional: quick links to saved plans
 
-### 3.2 Plan Page (/plan/[id])
+### 3.2 My Plans (/my-plans)
+
+**Features:**
+
+- Lists all plans the user has saved (not just viewed)
+- Stored in localStorage under `ffxiv-raidwide-my-plans` via `lib/my-plans-storage.ts` — no authentication or DB queries required
+- Populated by `savePlan()` in `lib/plan-service.ts` on every successful save via `upsertMyPlan()`
+- Each entry (`MyPlanEntry`) stores: `id`, `title`, `editLinkId`, `viewLinkId`, `encounterId`, `updatedAt`, `savedAt`
+- Each entry shows: plan title, save date, and encounter ID (if set)
+- Edit link → `/plan/{editLinkId}`
+- View link → `/plan/view/{viewLinkId}`
+- Remove button — calls `removeMyPlan(id)`, clears the entry from localStorage only; the Firestore plan is not deleted
+- Empty state when localStorage has no entries or has been cleared
+- Capped at 50 most recently saved plans (sorted by `savedAt` descending)
+- Subscribable via `subscribeToMyPlans()` — dispatches a `ffxiv-my-plans-updated` window event on write
+
+### 3.3 Plan Edit Page (/plan/[id])
+
+Route param `id` is the `editLinkId` (UUID). Fetched from Firestore via `getPlan(id)` using the document ID directly.
 
 This is the core of the app.
 
@@ -96,11 +114,24 @@ This is the core of the app.
 
 #### Link Behavior
 
-- Edit link → full editing rights + real‑time collaboration
-- View link → read‑only + comparison mode + user‑level preferences
-- Links are created once when the plan is saved for the first time.
+- Edit link (`/plan/{editLinkId}`) → full editing rights + real‑time collaboration; fetched by document ID via `getPlan()`
+- View link (`/plan/view/{viewLinkId}`) → read‑only; fetched by Firestore query via `getPlanByViewLink()` (`where("viewLinkId", "==", viewLinkId)`)
+- Both IDs are UUIDs generated once when the plan is saved for the first time.
 
-### 3.3 Ability Library (/library)
+### 3.3a Plan View Page (/plan/view/[id])
+
+Route param `id` is the `viewLinkId`. Loaded via `getPlanByViewLink()` — a Firestore query on the `viewLinkId` field.
+
+**Features:**
+
+- Read‑only rendering of the Timeline with `readOnly` prop
+- No editing, no autosave, no collaboration
+- Header shows plan title, player count, visible event count, and encounter duration
+- Displays `raidplanLink` as an external link if present
+- If the `viewLinkId` is invalid or the plan was deleted, shows a "Plan not found" error state
+- Uses the same Zustand plan store as the edit page (skips fetch if `storePlan.viewLinkId` already matches)
+
+### 3.4 Ability Library (/library)
 
 **Features:**
 
@@ -109,7 +140,7 @@ This is the core of the app.
 - Ability metadata editing (optional)
 - No job presets stored — jobs come from FFLogs or user selection
 
-### 3.4 Encounter Library (/encounters)
+### 3.5 Encounter Library (/encounters)
 
 **Features:**
 
@@ -134,7 +165,7 @@ This is the core of the app.
   - Adding encounter presets
   - Editing preset metadata
 
-### 3.5 Plan Comparison (/plan/[id]/compare)
+### 3.6 Plan Comparison (/plan/[id]/compare)
 
 **Features:**
 
@@ -149,7 +180,7 @@ This is the core of the app.
 - Per‑event summary
 - Single log comparison only
 
-### 3.6 Mistake Overview (/plan/[id]/mistakes)
+### 3.7 Mistake Overview (/plan/[id]/mistakes)
 
 *(Future but planned)*
 
@@ -162,7 +193,7 @@ This is the core of the app.
 - Per‑event mistake summary
 - "Most dangerous events" ranking
 
-### 3.7 Raidplan.io Integration
+### 3.8 Raidplan.io Integration
 
 **Features:**
 
