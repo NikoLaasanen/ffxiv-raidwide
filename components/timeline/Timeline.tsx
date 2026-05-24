@@ -545,7 +545,9 @@ const TimelineBodyRow = memo(
     )
 );
 
-export function Timeline({ timeline, players, casts, phases = [], initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId }: TimelineProps) {
+const EMPTY_PHASES: PhaseDivider[] = [];
+
+export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -585,18 +587,10 @@ export function Timeline({ timeline, players, casts, phases = [], initialAssignm
   useLayoutEffect(() => { onAssignmentsChangeRef.current = onAssignmentsChange; });
   useEffect(() => { onAssignmentsChangeRef.current?.(assignments); }, [assignments]);
   const [localTimeline, setLocalTimeline] = useState<TimelineRow[]>(timeline);
-  const [prevTimeline, setPrevTimeline] = useState<TimelineRow[]>(timeline);
-  if (prevTimeline !== timeline) {
-    setPrevTimeline(timeline);
-    setLocalTimeline(timeline);
-  }
+  useEffect(() => { setLocalTimeline(timeline); }, [timeline]);
 
   const [localPhases, setLocalPhases] = useState<PhaseDivider[]>(phases);
-  const [prevPhases, setPrevPhases] = useState<PhaseDivider[]>(phases);
-  if (prevPhases !== phases) {
-    setPrevPhases(phases);
-    setLocalPhases(phases);
-  }
+  useEffect(() => { setLocalPhases(phases); }, [phases]);
   const onPhasesChangeRef = useRef(onPhasesChange);
   useLayoutEffect(() => { onPhasesChangeRef.current = onPhasesChange; });
   useEffect(() => { onPhasesChangeRef.current?.(localPhases); }, [localPhases]);
