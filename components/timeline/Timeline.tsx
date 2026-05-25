@@ -381,8 +381,8 @@ const TimelineBodyRow = memo(
           )}
         </td>
         {isComparing && (() => {
-          const addedCount = cellStates.filter((cs) => cs.compareState === "original-only").length;
-          const removedCount = cellStates.filter((cs) => cs.compareState === "comparison-only").length;
+          const addedCount = cellStates.filter((cs) => cs.compareState === "comparison-only").length;
+          const removedCount = cellStates.filter((cs) => cs.compareState === "original-only").length;
           return (
             <td className="px-3 py-2 text-center font-mono text-xs whitespace-nowrap">
               {addedCount === 0 && removedCount === 0 ? (
@@ -480,8 +480,8 @@ const TimelineBodyRow = memo(
                     : inDuration
                     ? "border border-teal-200 dark:border-teal-800 hover:border-teal-400 dark:hover:border-teal-500"
                     : "border border-zinc-300 dark:border-slate-600 hover:border-teal-400 dark:hover:border-teal-500",
-                  compareState === "original-only" && "ring-2 ring-green-500 dark:ring-green-400",
-                  compareState === "comparison-only" && "ring-2 ring-red-500 dark:ring-red-400"
+                  compareState === "original-only" && "ring-2 ring-red-500 dark:ring-red-400",
+                  compareState === "comparison-only" && "ring-2 ring-green-500 dark:ring-green-400"
                 )}
                 aria-label={`Toggle ${ab.name}`}
               />
@@ -491,11 +491,11 @@ const TimelineBodyRow = memo(
               <span
                 className={cn(
                   "pointer-events-none absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full text-[8px] font-bold leading-none",
-                  compareState === "original-only" ? "bg-green-500 text-white" : "bg-red-500 text-white"
+                  compareState === "original-only" ? "bg-red-500 text-white" : "bg-green-500 text-white"
                 )}
                 aria-hidden
               >
-                {compareState === "original-only" ? "+" : "−"}
+                {compareState === "original-only" ? "−" : "+"}
               </span>
             ) : null;
 
