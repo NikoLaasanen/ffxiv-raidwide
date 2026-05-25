@@ -677,7 +677,12 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     const abilityIds = new Set(
       assignments.filter((a) => a.playerId === player.id && a.timestamp === myNextRow.timestamp).map((a) => a.abilityId)
     );
-    return Object.values(abilitiesByJob).flat().filter((ab) => abilityIds.has(ab.id));
+    const seen = new Set<string>();
+    return Object.values(abilitiesByJob).flat().filter((ab) => {
+      if (!abilityIds.has(ab.id) || seen.has(ab.id)) return false;
+      seen.add(ab.id);
+      return true;
+    });
   }, [myNextRow, myTimelinePlayerJob, players, assignments, abilitiesByJob]);
 
   useEffect(() => {
