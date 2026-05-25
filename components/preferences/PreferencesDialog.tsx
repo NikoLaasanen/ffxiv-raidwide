@@ -19,6 +19,7 @@ import {
   type AbilityTarget,
   type AbilityType,
 } from "@/store/preferences-store";
+import { ALL_JOBS } from "@/lib/jobs";
 
 const ABILITY_TARGETS: { value: AbilityTarget; label: string }[] = [
   { value: "party", label: "Party" },
@@ -43,6 +44,8 @@ export function PreferencesDialog() {
     activationBuffer, setActivationBuffer,
     abilityTargetFilter, setAbilityTargetFilter,
     abilityTypeFilter, setAbilityTypeFilter,
+    myPlanDefaultJob, setMyPlanDefaultJob,
+    myPlanIconsOnly, setMyPlanIconsOnly,
     resetPreferences,
   } = usePreferencesStore();
 
@@ -174,6 +177,30 @@ export function PreferencesDialog() {
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <span className="text-sm">Show mistakes column</span>
               <Switch checked={showMistakesColumn} onCheckedChange={setShowMistakesColumn} />
+            </label>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h3 className="text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+              My Plan
+            </h3>
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="default-job" className="text-sm">Default job</label>
+              <select
+                id="default-job"
+                value={myPlanDefaultJob ?? ""}
+                onChange={(e) => setMyPlanDefaultJob((e.target.value as (typeof ALL_JOBS)[number]) || null)}
+                className="h-8 rounded-md border border-zinc-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-zinc-700 dark:text-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              >
+                <option value="">None</option>
+                {ALL_JOBS.map((job) => (
+                  <option key={job} value={job}>{job}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span className="text-sm">Show only ability icons</span>
+              <Switch checked={myPlanIconsOnly} onCheckedChange={setMyPlanIconsOnly} />
             </label>
           </section>
         </div>

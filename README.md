@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FFXIV Raidwide
+
+An interactive raid mitigation planner for Final Fantasy XIV. Build cooldown plans on a vertical boss-ability timeline, import fights from FFLogs, and share plans with your static via edit/view links.
+
+## Features
+
+- **Vertical timeline** — boss abilities mapped to a scrollable timeline with per-player mitigation assignments
+- **Cooldown tracking** — automatic cooldown conflict detection and damage/mitigation calculations
+- **FFLogs import** — pull encounter data directly from a log URL to populate the timeline
+- **Plan comparison** — overlay actual FFLogs execution against your planned mitigation
+- **Mistake analysis** — death, vulnerability, and damage-down timeline per player
+- **Plan sharing** — unique edit and view-only links, with optional real-time collaboration
+- **Encounter presets** — pre-built timelines for current raid tiers
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router), TypeScript |
+| Styling | Tailwind CSS v4, Radix UI, ShadCN/UI |
+| State | Zustand, TanStack Query |
+| Database | Firebase Firestore |
+| External APIs | FFLogs GraphQL v2, XIVAPI |
+
+## Routes
+
+| Route | Purpose |
+|---|---|
+| `/` | Homepage: FFLogs URL import, recently viewed plans, create new |
+| `/plan/[id]` | Core plan editor: timeline, mitigation assignment, cooldown logic |
+| `/plan/[id]/compare` | Overlay FFLogs execution on planned timeline |
+| `/plan/[id]/mistakes` | Death/vuln/damage-down timeline and per-player summary |
+| `/library` | Ability library: toggle abilities per job |
+| `/encounters` | Encounter presets browser, grouped by raid tier |
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Commands
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bun run dev        # Start dev server (Turbopack)
+bun run build      # Production build
+bun run start      # Start production server
+bun run lint       # Run ESLint
+bun run lint:fix   # Run ESLint with auto-fix
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment Variables
 
-## Learn More
+Create a `.env.local` file at the project root:
 
-To learn more about Next.js, take a look at the following resources:
+```env
+# Firebase (client-side)
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Firebase Admin (server-side)
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# FFLogs API
+FFLOGS_CLIENT_ID=
+FFLOGS_CLIENT_SECRET=
+```
 
-## Deploy on Vercel
+## Docs
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Technical Documentation](TECHNICAL_DOCUMENTATION.md) — architecture, data shapes, API design
+- [Database Structure](DATABASE_STRUCTURE.md) — Firestore collection schemas

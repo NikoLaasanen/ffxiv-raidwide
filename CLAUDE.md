@@ -14,12 +14,14 @@ Keep your replies extremely concise and focus on conveying the key information. 
 
 ## Commands
 
+This project uses **Bun** as the package manager and runtime.
+
 ```bash
-npm run dev        # Start dev server (Turbopack, outputs to .next/dev)
-npm run build      # Production build (Turbopack)
-npm run start      # Start production server
-npm run lint       # Run ESLint
-npm run lint:fix   # Run ESLint with auto-fix
+bun run dev        # Start dev server (Turbopack, outputs to .next/dev)
+bun run build      # Production build (Turbopack)
+bun run start      # Start production server
+bun run lint       # Run ESLint
+bun run lint:fix   # Run ESLint with auto-fix
 ```
 
 No test runner is configured yet.

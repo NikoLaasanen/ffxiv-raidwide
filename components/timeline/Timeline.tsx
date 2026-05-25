@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, mem
 import type { TimelineRow, MitigationAssignment, MechanicType, PlayerMistakeState } from "@/types/timeline";
 import type { DamageType } from "@/types/common";
 import type { Player, PhaseDivider } from "@/types/player";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Play, Pause, RotateCcw } from "lucide-react";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { PlayerCastEvent } from "@/types/fflogs";
@@ -25,6 +25,7 @@ import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
 import { FavoriteButton } from "@/components/plan/FavoriteButton";
 import { CompareDialog } from "@/components/plan/CompareDialog";
 import { usePlanStore } from "@/store/plan-store";
+import { MyTimeline } from "@/components/timeline/MyTimeline";
 
 interface TimelineProps {
   timeline: TimelineRow[];
@@ -566,6 +567,12 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     activationBuffer,
     abilityTargetFilter,
     abilityTypeFilter,
+    timelineViewMode,
+    myTimelinePlayerJob,
+    myPlanDefaultJob,
+    myPlanIconsOnly,
+    setTimelineViewMode,
+    setMyTimelinePlayerJob,
   } = usePreferencesStore(
     useShallow((s) => ({
       showAutoAttacks: s.showAutoAttacks,
@@ -576,6 +583,12 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       activationBuffer: s.activationBuffer,
       abilityTargetFilter: s.abilityTargetFilter,
       abilityTypeFilter: s.abilityTypeFilter,
+      timelineViewMode: s.timelineViewMode,
+      myTimelinePlayerJob: s.myTimelinePlayerJob,
+      myPlanDefaultJob: s.myPlanDefaultJob,
+      myPlanIconsOnly: s.myPlanIconsOnly,
+      setTimelineViewMode: s.setTimelineViewMode,
+      setMyTimelinePlayerJob: s.setMyTimelinePlayerJob,
     }))
   );
 
@@ -603,6 +616,75 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   const onPhasesChangeRef = useRef(onPhasesChange);
   useLayoutEffect(() => { onPhasesChangeRef.current = onPhasesChange; });
   useEffect(() => { onPhasesChangeRef.current?.(localPhases); }, [localPhases]);
+
+  const myRoleColor = myTimelinePlayerJob ? (JOB_ROLE_COLOR[myTimelinePlayerJob] ?? "#94a3b8") : "#94a3b8";
+
+  const [isRunning, setIsRunning] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
+  const accumulatedRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isRunning) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+    startTimeRef.current = Date.now();
+    const tick = () => {
+      setElapsedMs(accumulatedRef.current + (Date.now() - startTimeRef.current!));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [isRunning]);
+
+  function handlePlayPause() {
+    if (isRunning) {
+      accumulatedRef.current = elapsedMs;
+      setIsRunning(false);
+    } else {
+      setIsRunning(true);
+    }
+  }
+
+  function handleReset() {
+    setIsRunning(false);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    accumulatedRef.current = 0;
+    setElapsedMs(0);
+  }
+
+  const { myCurrentRow, myNextRow } = useMemo(() => {
+    if (!myTimelinePlayerJob) return { myCurrentRow: null, myNextRow: null };
+    const player = players.find((p) => p.job === myTimelinePlayerJob) ?? null;
+    if (!player) return { myCurrentRow: null, myNextRow: null };
+    const ts = new Set(assignments.filter((a) => a.playerId === player.id).map((a) => a.timestamp));
+    const assigned = localTimeline.filter((r) => !r.hidden && ts.has(r.timestamp));
+    let current: TimelineRow | null = null;
+    for (const r of assigned) {
+      if (r.timestamp <= elapsedMs) current = r;
+      else break;
+    }
+    const next = assigned.find((r) => r.timestamp > elapsedMs) ?? null;
+    return { myCurrentRow: current, myNextRow: next };
+  }, [myTimelinePlayerJob, players, assignments, localTimeline, elapsedMs]);
+
+  const myNextRowAbilities = useMemo(() => {
+    if (!myNextRow || !myTimelinePlayerJob) return [];
+    const player = players.find((p) => p.job === myTimelinePlayerJob);
+    if (!player) return [];
+    const abilityIds = new Set(
+      assignments.filter((a) => a.playerId === player.id && a.timestamp === myNextRow.timestamp).map((a) => a.abilityId)
+    );
+    return Object.values(abilitiesByJob).flat().filter((ab) => abilityIds.has(ab.id));
+  }, [myNextRow, myTimelinePlayerJob, players, assignments, abilitiesByJob]);
+
+  useEffect(() => {
+    if (myTimelinePlayerJob === null && myPlanDefaultJob !== null && allJobs.includes(myPlanDefaultJob)) {
+      setMyTimelinePlayerJob(myPlanDefaultJob);
+    }
+  }, [myTimelinePlayerJob, myPlanDefaultJob, allJobs, setMyTimelinePlayerJob]);
 
   function addPhase(atTimestamp: number) {
     setLocalPhases((prev) => {
@@ -931,6 +1013,33 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
         <div className="flex items-center justify-between gap-2">
           {headerLeft ?? <div />}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Full timeline / My plan toggle — desktop only, view mode */}
+            {readOnly && (
+              <div className="hidden md:flex rounded-md overflow-hidden border border-zinc-200 dark:border-slate-700 text-xs font-medium">
+                <button
+                  onClick={() => setTimelineViewMode("full")}
+                  className={cn(
+                    "px-3 py-1.5 transition-colors",
+                    timelineViewMode === "full"
+                      ? "bg-teal-600 dark:bg-teal-700 text-white"
+                      : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
+                  )}
+                >
+                  Full timeline
+                </button>
+                <button
+                  onClick={() => setTimelineViewMode("my")}
+                  className={cn(
+                    "px-3 py-1.5 transition-colors border-l border-zinc-200 dark:border-slate-700",
+                    timelineViewMode === "my"
+                      ? "bg-teal-600 dark:bg-teal-700 text-white"
+                      : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
+                  )}
+                >
+                  My plan
+                </button>
+              </div>
+            )}
             {readOnly && comparisonLabel && (
               <div className="flex items-center gap-1.5 rounded-md bg-zinc-100 dark:bg-slate-800 px-2 py-1 text-xs text-zinc-600 dark:text-slate-400">
                 <span className="font-medium">Comparing:</span>
@@ -961,7 +1070,130 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             <PreferencesDialog />
           </div>
         </div>
-        <div ref={scrollContainerRef} className="relative overflow-auto max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
+
+        {/* Full-width Full/My plan toggle — mobile only, view mode */}
+        {readOnly && (
+          <div className="flex md:hidden rounded-md overflow-hidden border border-zinc-200 dark:border-slate-700 text-xs font-medium">
+            <button
+              onClick={() => setTimelineViewMode("full")}
+              className={cn(
+                "flex-1 py-2 transition-colors",
+                timelineViewMode === "full"
+                  ? "bg-teal-600 dark:bg-teal-700 text-white font-semibold"
+                  : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400"
+              )}
+            >
+              Full timeline
+            </button>
+            <button
+              onClick={() => setTimelineViewMode("my")}
+              className={cn(
+                "flex-1 py-2 transition-colors border-l border-zinc-200 dark:border-slate-700",
+                timelineViewMode === "my"
+                  ? "bg-teal-600 dark:bg-teal-700 text-white font-semibold"
+                  : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400"
+              )}
+            >
+              My plan
+            </button>
+          </div>
+        )}
+
+        {/* Player controls — only in My view (read-only) */}
+        {readOnly && timelineViewMode === "my" && (
+          <div className="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 px-3 py-2 bg-zinc-50 dark:bg-slate-900">
+            <div className="relative flex-1 min-w-0">
+              <span
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-1 h-4 rounded-sm z-10 pointer-events-none"
+                style={{ backgroundColor: myRoleColor }}
+              />
+              <select
+                value={myTimelinePlayerJob ?? ""}
+                onChange={(e) => {
+                  if (e.target.value) setMyTimelinePlayerJob(e.target.value as JobAbbreviation);
+                }}
+                className="w-full h-8 pl-5 pr-2 rounded-md border border-zinc-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-zinc-700 dark:text-slate-200 appearance-none focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
+              >
+                <option value="">Pick your job…</option>
+                {allJobs.map((job) => {
+                  const p = playerByJob.get(job);
+                  return p ? <option key={p.id} value={job}>{job}</option> : null;
+                })}
+              </select>
+              <ChevronDown
+                size={12}
+                className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400 dark:text-slate-500"
+              />
+            </div>
+            <button
+              onClick={handlePlayPause}
+              title={isRunning ? "Pause timer" : "Play timer"}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 dark:border-slate-700 text-zinc-600 dark:text-slate-300 hover:bg-zinc-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              aria-label={isRunning ? "Pause timer" : "Play timer"}
+            >
+              {isRunning ? <Pause size={14} /> : <Play size={14} />}
+            </button>
+            <button
+              onClick={handleReset}
+              title="Reset timer"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 dark:border-slate-700 text-zinc-600 dark:text-slate-300 hover:bg-zinc-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+              aria-label="Reset timer"
+            >
+              <RotateCcw size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Next Up — only in My view (read-only) when there's an assignment */}
+        {readOnly && timelineViewMode === "my" && myNextRow && (
+          <div className="relative flex flex-col gap-1.5 px-4 py-2.5 rounded-lg border border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/40 overflow-hidden">
+            <div
+              className="absolute bottom-0 left-0 h-0.5 bg-teal-400/50 dark:bg-teal-400/30"
+              style={{
+                width: `${(() => {
+                  if (!isRunning && elapsedMs === 0) return 0;
+                  const start = myCurrentRow?.timestamp ?? 0;
+                  const end = myNextRow.timestamp;
+                  if (end <= start) return 100;
+                  return Math.min(100, Math.max(0, ((elapsedMs - start) / (end - start)) * 100));
+                })()}%`,
+              }}
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold font-mono tracking-wider text-teal-600 dark:text-teal-400 shrink-0">
+                NEXT UP
+              </span>
+              <span className={cn(
+                "font-mono text-sm font-bold shrink-0 tabular-nums",
+                !isRunning && elapsedMs > 0
+                  ? "text-teal-500 dark:text-teal-400 animate-pulse"
+                  : "text-teal-700 dark:text-teal-300"
+              )}>
+                {(isRunning || elapsedMs > 0) ? formatTimestamp(myNextRow.timestamp - elapsedMs) : "——:——"}
+              </span>
+            </div>
+            <span className="text-base font-semibold text-zinc-800 dark:text-slate-100">
+              {myNextRow.bossAbility}
+            </span>
+            {myNextRowAbilities.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {myNextRowAbilities.map((ability) =>
+                  myPlanIconsOnly ? (
+                    <Image key={ability.id} src={ability.iconPath} alt={ability.name} width={32} height={32} className="rounded" title={ability.name} />
+                  ) : (
+                    <span key={ability.id} className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium bg-white dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300">
+                      <Image src={ability.iconPath} alt={ability.name} width={32} height={32} className="rounded-sm shrink-0" />
+                      {ability.name}
+                    </span>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {(!readOnly || timelineViewMode === "full") && (
+        <div ref={scrollContainerRef} className="relative overflow-auto min-h-48 max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
           {isLoading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-950/70 backdrop-blur-[2px]">
               <div className="flex flex-col items-center gap-2 text-sm text-zinc-500 dark:text-slate-400">
@@ -1126,6 +1358,18 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             </tbody>
           </table>
         </div>
+        )}
+        {readOnly && timelineViewMode === "my" && (
+          <MyTimeline
+            players={players}
+            timeline={localTimeline}
+            phases={localPhases}
+            assignments={assignments}
+            abilitiesByJob={abilitiesByJob}
+            selectedJob={myTimelinePlayerJob}
+            currentTimestamp={myNextRow?.timestamp ?? null}
+          />
+        )}
 
         {!readOnly && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 p-4">
           {/* Active roster strip — Option A */}

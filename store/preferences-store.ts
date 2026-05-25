@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { JobAbbreviation } from "@/types/ffixiv-job";
 
 export type AbilityTarget = "self" | "party" | "single";
 export type AbilityType = "mitigation" | "utility" | "buff" | "interrupt";
+export type TimelineViewMode = "full" | "my";
 
 export interface UserPreferences {
   showAutoAttacks: boolean;
@@ -13,6 +15,10 @@ export interface UserPreferences {
   showSourceColumn: boolean;
   showMechanicTypeColumn: boolean;
   showMistakesColumn: boolean;
+  timelineViewMode: TimelineViewMode;
+  myTimelinePlayerJob: JobAbbreviation | null;
+  myPlanDefaultJob: JobAbbreviation | null;
+  myPlanIconsOnly: boolean;
 }
 
 interface PreferencesActions {
@@ -24,6 +30,10 @@ interface PreferencesActions {
   setShowSourceColumn: (v: boolean) => void;
   setShowMechanicTypeColumn: (v: boolean) => void;
   setShowMistakesColumn: (v: boolean) => void;
+  setTimelineViewMode: (v: TimelineViewMode) => void;
+  setMyTimelinePlayerJob: (v: JobAbbreviation | null) => void;
+  setMyPlanDefaultJob: (v: JobAbbreviation | null) => void;
+  setMyPlanIconsOnly: (v: boolean) => void;
   resetPreferences: () => void;
 }
 
@@ -36,6 +46,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   showSourceColumn: false,
   showMechanicTypeColumn: false,
   showMistakesColumn: false,
+  timelineViewMode: "full",
+  myTimelinePlayerJob: null,
+  myPlanDefaultJob: null,
+  myPlanIconsOnly: false,
 };
 
 export const usePreferencesStore = create<UserPreferences & PreferencesActions>()(
@@ -51,6 +65,10 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
       setShowSourceColumn: (v) => set({ showSourceColumn: v }),
       setShowMechanicTypeColumn: (v) => set({ showMechanicTypeColumn: v }),
       setShowMistakesColumn: (v) => set({ showMistakesColumn: v }),
+      setTimelineViewMode: (v) => set({ timelineViewMode: v }),
+      setMyTimelinePlayerJob: (v) => set({ myTimelinePlayerJob: v }),
+      setMyPlanDefaultJob: (v) => set({ myPlanDefaultJob: v }),
+      setMyPlanIconsOnly: (v) => set({ myPlanIconsOnly: v }),
       resetPreferences: () => set(DEFAULT_PREFERENCES),
     }),
     {
@@ -66,6 +84,10 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
         showSourceColumn: state.showSourceColumn,
         showMechanicTypeColumn: state.showMechanicTypeColumn,
         showMistakesColumn: state.showMistakesColumn,
+        timelineViewMode: state.timelineViewMode,
+        myTimelinePlayerJob: state.myTimelinePlayerJob,
+        myPlanDefaultJob: state.myPlanDefaultJob,
+        myPlanIconsOnly: state.myPlanIconsOnly,
       }),
     }
   )
