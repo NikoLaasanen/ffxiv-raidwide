@@ -3,12 +3,13 @@ import type { FflogsImportResult } from "@/types/fflogs";
 
 export type { FflogsImportResult };
 
-const FFLOGS_URL_REGEX = /fflogs\.com\/reports\/([^/?#]+).*?[?&]fight=(\d+)/;
+const FFLOGS_URL_REGEX = /fflogs\.com\/reports\/([^/?#]+).*?[?&]fight=(last|\d+)/;
 
 export function parseFflogsUrl(url: string): { reportCode: string; fightId: number } | null {
   const match = FFLOGS_URL_REGEX.exec(url);
   if (!match) return null;
-  return { reportCode: match[1], fightId: parseInt(match[2], 10) };
+  const fightId = match[2] === "last" ? -1 : parseInt(match[2], 10);
+  return { reportCode: match[1], fightId };
 }
 
 export function useFflogsImport() {

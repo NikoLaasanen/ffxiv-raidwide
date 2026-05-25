@@ -41,6 +41,20 @@ const EVENTS_QUERY = `
   }
 `;
 
+const ALL_FIGHTS_QUERY = `
+  query AllFights($code: String!) {
+    reportData {
+      report(code: $code) {
+        fights { id name encounterID startTime endTime kill friendlyPlayers }
+        masterData {
+          actors { id name type subType }
+          abilities { gameID name type }
+        }
+      }
+    }
+  }
+`;
+
 async function fetchAllEvents(
   code: string,
   fightID: number,
@@ -385,15 +399,36 @@ export async function POST(request: Request): Promise<Response> {
   if (typeof reportCode !== "string" || !reportCode) {
     return Response.json({ error: "reportCode must be a non-empty string" }, { status: 400 });
   }
-  if (!Number.isInteger(fightId) || (fightId as number) < 1) {
+  if (!Number.isInteger(fightId) || ((fightId as number) < 1 && fightId !== -1)) {
     return Response.json({ error: "fightId must be a positive integer" }, { status: 400 });
   }
 
   try {
-    const meta = await fflogsGraphQL<FFLogsMetaResponse>(FIGHT_META_QUERY, {
-      code: reportCode,
-      fightID: fightId,
-    });
+    let resolvedFightId = fightId as number;
+    let meta: FFLogsMetaResponse;
+
+    if (resolvedFightId === -1) {
+      const allMeta = await fflogsGraphQL<FFLogsMetaResponse>(ALL_FIGHTS_QUERY, { code: reportCode });
+      const fights = allMeta.reportData.report.fights;
+      if (!fights.length) {
+        return Response.json({ error: "No fights found in report" }, { status: 404 });
+      }
+      resolvedFightId = fights[fights.length - 1].id;
+      meta = {
+        ...allMeta,
+        reportData: {
+          report: {
+            ...allMeta.reportData.report,
+            fights: [fights[fights.length - 1]],
+          },
+        },
+      };
+    } else {
+      meta = await fflogsGraphQL<FFLogsMetaResponse>(FIGHT_META_QUERY, {
+        code: reportCode,
+        fightID: resolvedFightId,
+      });
+    }
 
     const report = meta.reportData.report;
     const fight: FFLogsFight | undefined = report.fights[0];
@@ -429,10 +464,10 @@ export async function POST(request: Request): Promise<Response> {
     const playerActorIdSet = new Set(playerActors.map((a) => a.id));
 
     const [damageTaken, deaths, debuffs, rawCasts] = await Promise.all([
-      fetchAllEvents(reportCode, fightId as number, "DamageTaken"),
-      fetchAllEvents(reportCode, fightId as number, "Deaths"),
-      fetchAllEvents(reportCode, fightId as number, "Debuffs"),
-      fetchAllEvents(reportCode, fightId as number, "Casts"),
+      fetchAllEvents(reportCode, resolvedFightId, "DamageTaken"),
+      fetchAllEvents(reportCode, resolvedFightId, "Deaths"),
+      fetchAllEvents(reportCode, resolvedFightId, "Debuffs"),
+      fetchAllEvents(reportCode, resolvedFightId, "Casts"),
     ]);
 
     const timeline = normalizeTimeline(
