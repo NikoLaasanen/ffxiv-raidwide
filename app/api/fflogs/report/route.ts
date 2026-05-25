@@ -13,6 +13,7 @@ import type { TimelineRow, PlayerMistakeState, MechanicType } from "@/types/time
 import type { DamageType } from "@/types/common";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import { FFLOGS_JOB_MAP } from "@/lib/jobs";
+import { isAutoAttack } from "@/lib/is-auto-attack";
 
 const FIGHT_META_QUERY = `
   query FightMeta($code: String!, $fightID: Int!) {
@@ -208,7 +209,7 @@ function normalizeTimeline(
           ? { rawDamage, allDamages, type: abilityInfo ? mapDamageType(abilityInfo.type) : "magical" }
           : undefined,
       playerMistakes: playerMistakesBase(),
-      hidden: bossAbilityName === "Attack",
+      hidden: isAutoAttack(bossAbilityName),
       _targetIds: group.map((e) => e.targetID),
     };
   });

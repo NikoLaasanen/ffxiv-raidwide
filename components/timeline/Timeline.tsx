@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useJobAbilities } from "@/hooks/use-job-abilities";
 import { computeRowMitigation } from "@/lib/compute-mitigation";
+import { isAutoAttack as isAutoAttackAbility } from "@/lib/is-auto-attack";
 import type { RowMitigation } from "@/lib/compute-mitigation";
 import { usePreferencesStore } from "@/store/preferences-store";
 import { useShallow } from "zustand/react/shallow";
@@ -886,7 +887,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   const visibleRows = useMemo(
     () =>
       localTimeline.filter((row) => {
-        const isAutoAttack = row.bossAbility.toLowerCase() === "attack";
+        const isAutoAttack = isAutoAttackAbility(row.bossAbility);
         if (isAutoAttack) return showAutoAttacks;
         return !row.hidden;
       }),
