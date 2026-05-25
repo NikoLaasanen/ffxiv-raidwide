@@ -18,7 +18,7 @@ export interface UserPreferences {
   timelineViewMode: TimelineViewMode;
   myTimelinePlayerJob: JobAbbreviation | null;
   myPlanDefaultJob: JobAbbreviation | null;
-  myPlanIconsOnly: boolean;
+  myPlanCompactView: boolean;
 }
 
 interface PreferencesActions {
@@ -33,7 +33,7 @@ interface PreferencesActions {
   setTimelineViewMode: (v: TimelineViewMode) => void;
   setMyTimelinePlayerJob: (v: JobAbbreviation | null) => void;
   setMyPlanDefaultJob: (v: JobAbbreviation | null) => void;
-  setMyPlanIconsOnly: (v: boolean) => void;
+  setMyPlanCompactView: (v: boolean) => void;
   resetPreferences: () => void;
 }
 
@@ -49,7 +49,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   timelineViewMode: "full",
   myTimelinePlayerJob: null,
   myPlanDefaultJob: null,
-  myPlanIconsOnly: false,
+  myPlanCompactView: false,
 };
 
 export const usePreferencesStore = create<UserPreferences & PreferencesActions>()(
@@ -68,7 +68,7 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
       setTimelineViewMode: (v) => set({ timelineViewMode: v }),
       setMyTimelinePlayerJob: (v) => set({ myTimelinePlayerJob: v }),
       setMyPlanDefaultJob: (v) => set({ myPlanDefaultJob: v }),
-      setMyPlanIconsOnly: (v) => set({ myPlanIconsOnly: v }),
+      setMyPlanCompactView: (v) => set({ myPlanCompactView: v }),
       resetPreferences: () => set(DEFAULT_PREFERENCES),
     }),
     {
@@ -87,7 +87,7 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
         timelineViewMode: state.timelineViewMode,
         myTimelinePlayerJob: state.myTimelinePlayerJob,
         myPlanDefaultJob: state.myPlanDefaultJob,
-        myPlanIconsOnly: state.myPlanIconsOnly,
+        myPlanCompactView: state.myPlanCompactView,
       }),
     }
   )

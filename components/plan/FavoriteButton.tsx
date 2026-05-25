@@ -35,14 +35,14 @@ export function FavoriteButton({ viewLinkId, title, encounterId }: FavoriteButto
       onClick={toggle}
       aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
       className={cn(
-        "flex items-center justify-center rounded p-1.5 cursor-pointer transition-colors",
+        "flex items-center justify-center size-7 rounded cursor-pointer transition-colors",
         favorited
           ? "text-rose-500 hover:text-rose-600"
           : "text-zinc-400 hover:text-rose-400"
       )}
     >
       <Heart
-        size={18}
+        size={16}
         className={cn(favorited && "fill-current")}
       />
     </button>

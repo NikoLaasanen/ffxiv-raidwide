@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, mem
 import type { TimelineRow, MitigationAssignment, MechanicType, PlayerMistakeState } from "@/types/timeline";
 import type { DamageType } from "@/types/common";
 import type { Player, PhaseDivider } from "@/types/player";
-import { ChevronDown, ChevronRight, Play, Pause, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, Play, Pause, RotateCcw, ExternalLink } from "lucide-react";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { PlayerCastEvent } from "@/types/fflogs";
@@ -39,6 +39,7 @@ interface TimelineProps {
   viewLinkId?: string;
   title?: string;
   encounterId?: string | null;
+  raidplanLink?: string;
   headerLeft?: React.ReactNode;
 }
 
@@ -557,7 +558,7 @@ const TimelineBodyRow = memo(
 
 const EMPTY_PHASES: PhaseDivider[] = [];
 
-export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId, headerLeft }: TimelineProps) {
+export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId, raidplanLink, headerLeft }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -570,7 +571,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     timelineViewMode,
     myTimelinePlayerJob,
     myPlanDefaultJob,
-    myPlanIconsOnly,
+    myPlanCompactView,
     setTimelineViewMode,
     setMyTimelinePlayerJob,
   } = usePreferencesStore(
@@ -586,7 +587,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       timelineViewMode: s.timelineViewMode,
       myTimelinePlayerJob: s.myTimelinePlayerJob,
       myPlanDefaultJob: s.myPlanDefaultJob,
-      myPlanIconsOnly: s.myPlanIconsOnly,
+      myPlanCompactView: s.myPlanCompactView,
       setTimelineViewMode: s.setTimelineViewMode,
       setMyTimelinePlayerJob: s.setMyTimelinePlayerJob,
     }))
@@ -684,6 +685,35 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       return true;
     });
   }, [myNextRow, myTimelinePlayerJob, players, assignments, abilitiesByJob]);
+
+  const myNextRowFollowups = useMemo(() => {
+    if (!myNextRow || !myTimelinePlayerJob) return [];
+    const player = players.find((p) => p.job === myTimelinePlayerJob);
+    if (!player) return [];
+    const cutoff = myNextRow.timestamp + 5000;
+    const byTimestamp = new Map<number, Set<string>>();
+    for (const a of assignments) {
+      if (a.playerId === player.id && a.timestamp > myNextRow.timestamp && a.timestamp <= cutoff) {
+        if (!byTimestamp.has(a.timestamp)) byTimestamp.set(a.timestamp, new Set());
+        byTimestamp.get(a.timestamp)!.add(a.abilityId);
+      }
+    }
+    if (byTimestamp.size === 0) return [];
+    const followupRows = localTimeline
+      .filter((r) => !r.hidden && byTimestamp.has(r.timestamp))
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const allAbilities = Object.values(abilitiesByJob).flat();
+    return followupRows.map((row) => {
+      const abilityIds = byTimestamp.get(row.timestamp)!;
+      const seen = new Set<string>();
+      const abilities = allAbilities.filter((ab) => {
+        if (!abilityIds.has(ab.id) || seen.has(ab.id)) return false;
+        seen.add(ab.id);
+        return true;
+      });
+      return { row, abilities };
+    }).filter((f) => f.abilities.length > 0);
+  }, [myNextRow, myTimelinePlayerJob, players, assignments, localTimeline, abilitiesByJob]);
 
   useEffect(() => {
     if (myTimelinePlayerJob === null && myPlanDefaultJob !== null && allJobs.includes(myPlanDefaultJob)) {
@@ -1058,21 +1088,30 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                 </button>
               </div>
             )}
-            {viewLinkId && title !== undefined && (
-              <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
-            )}
-            {readOnly && viewLinkId && (
-              <CompareDialog
-                originalPlayers={players}
-                originalTimeline={timeline}
-                originalTitle={title ?? ""}
-                abilitiesByJob={abilitiesByJob}
-                abilitiesLoading={isLoading}
-                onCompare={(a, label) => setComparison(a, label)}
-                onClear={() => setComparison(null, null)}
-              />
-            )}
-            <PreferencesDialog />
+            <div className="grid grid-cols-2 gap-1.5 md:flex md:items-center md:gap-2">
+              {raidplanLink && (
+                <Button variant="outline" size="icon-sm" asChild aria-label="View on FFLogs">
+                  <a href={raidplanLink} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink size={16} />
+                  </a>
+                </Button>
+              )}
+              {viewLinkId && title !== undefined && (
+                <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
+              )}
+              {readOnly && viewLinkId && (
+                <CompareDialog
+                  originalPlayers={players}
+                  originalTimeline={timeline}
+                  originalTitle={title ?? ""}
+                  abilitiesByJob={abilitiesByJob}
+                  abilitiesLoading={isLoading}
+                  onCompare={(a, label) => setComparison(a, label)}
+                  onClear={() => setComparison(null, null)}
+                />
+              )}
+              <PreferencesDialog />
+            </div>
           </div>
         </div>
 
@@ -1183,7 +1222,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             {myNextRowAbilities.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap">
                 {myNextRowAbilities.map((ability) =>
-                  myPlanIconsOnly ? (
+                  myPlanCompactView ? (
                     <Image key={ability.id} src={ability.iconPath} alt={ability.name} width={32} height={32} className="rounded" title={ability.name} />
                   ) : (
                     <span key={ability.id} className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium bg-white dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300">
@@ -1192,6 +1231,20 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                     </span>
                   )
                 )}
+              </div>
+            )}
+            {myNextRowFollowups.length > 0 && (
+              <div className="flex flex-col gap-1 pt-1.5 border-t border-teal-200/60 dark:border-teal-800/40">
+                {myNextRowFollowups.map(({ row, abilities }) => (
+                  <div key={row.timestamp} className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono font-semibold text-teal-500 dark:text-teal-400 shrink-0">
+                      +{formatTimestamp(row.timestamp - myNextRow.timestamp)}
+                    </span>
+                    {abilities.map((ability) => (
+                      <Image key={ability.id} src={ability.iconPath} alt={ability.name} width={24} height={24} className="rounded opacity-80" title={ability.name} />
+                    ))}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1373,6 +1426,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             abilitiesByJob={abilitiesByJob}
             selectedJob={myTimelinePlayerJob}
             currentTimestamp={myNextRow?.timestamp ?? null}
+            onTogglePhase={stableTogglePhase}
           />
         )}
 

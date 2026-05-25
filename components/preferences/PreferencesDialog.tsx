@@ -45,7 +45,7 @@ export function PreferencesDialog() {
     abilityTargetFilter, setAbilityTargetFilter,
     abilityTypeFilter, setAbilityTypeFilter,
     myPlanDefaultJob, setMyPlanDefaultJob,
-    myPlanIconsOnly, setMyPlanIconsOnly,
+    myPlanCompactView, setMyPlanCompactView,
     resetPreferences,
   } = usePreferencesStore();
 
@@ -69,7 +69,7 @@ export function PreferencesDialog() {
     <Dialog>
       <DialogTrigger asChild>
         <Button variant="outline" size="icon-sm" aria-label="Timeline preferences">
-          <SettingsIcon />
+          <SettingsIcon size={16} />
         </Button>
       </DialogTrigger>
 
@@ -199,8 +199,8 @@ export function PreferencesDialog() {
               </select>
             </div>
             <label className="flex items-center justify-between gap-3 cursor-pointer">
-              <span className="text-sm">Show only ability icons</span>
-              <Switch checked={myPlanIconsOnly} onCheckedChange={setMyPlanIconsOnly} />
+              <span className="text-sm">Compact view</span>
+              <Switch checked={myPlanCompactView} onCheckedChange={setMyPlanCompactView} />
             </label>
           </section>
         </div>

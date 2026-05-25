@@ -148,8 +148,8 @@ export function CompareDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon" aria-label="Compare plans">
-          <GitCompareArrows className="h-4 w-4" />
+        <Button variant="outline" size="icon-sm" aria-label="Compare plans">
+          <GitCompareArrows size={16} />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

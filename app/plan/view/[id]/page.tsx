@@ -77,21 +77,10 @@ export default function PlanViewPage({
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}
+        raidplanLink={storePlan.raidplanLink ?? undefined}
         headerLeft={
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{storePlan.title}</h1>
-              {storePlan.raidplanLink && (
-                <a
-                  href={storePlan.raidplanLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-                >
-                  View on FFLogs ↗
-                </a>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold">{storePlan.title}</h1>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               {storePlan.players.length} players · {visibleRows.length} timeline events · {duration}
             </p>

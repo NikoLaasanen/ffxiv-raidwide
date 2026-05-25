@@ -33,6 +33,7 @@ interface MyTimelineProps {
   abilitiesByJob: Record<JobAbbreviation, JobAbilityRecord[]>;
   selectedJob: JobAbbreviation | null;
   currentTimestamp?: number | null;
+  onTogglePhase?: (timestamp: number) => void;
 }
 
 type DisplayItem =
@@ -47,8 +48,9 @@ export function MyTimeline({
   abilitiesByJob,
   selectedJob,
   currentTimestamp,
+  onTogglePhase,
 }: MyTimelineProps) {
-  const myPlanIconsOnly = usePreferencesStore((s) => s.myPlanIconsOnly);
+  const myPlanCompactView = usePreferencesStore((s) => s.myPlanCompactView);
   const [toolboxOpen, setToolboxOpen] = useState(false);
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -137,6 +139,7 @@ export function MyTimeline({
         });
         lastPhaseIdx = currentPhaseIdx;
       }
+      if (currentPhaseIdx >= 0 && sortedPhases[currentPhaseIdx].collapsed) continue;
       items.push({
         kind: "row",
         row,
@@ -183,18 +186,22 @@ export function MyTimeline({
             {displayItems.map((item, idx) => {
               if (item.kind === "phase") {
                 return (
-                  <div
+                  <button
                     key={`phase-${item.phase.timestamp}`}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-100/80 dark:bg-slate-800/60 border-b border-zinc-200 dark:border-slate-700"
+                    onClick={() => onTogglePhase?.(item.phase.timestamp)}
+                    className="flex w-full items-center gap-2 px-4 py-2 bg-zinc-100/80 dark:bg-slate-800/60 border-b border-zinc-200 dark:border-slate-700 text-left hover:bg-zinc-200/60 dark:hover:bg-slate-700/60 transition-colors"
                   >
-                    <ChevronDown size={13} className="text-teal-500 dark:text-teal-400 shrink-0" />
+                    {item.phase.collapsed
+                      ? <ChevronRight size={13} className="text-teal-500 dark:text-teal-400 shrink-0" />
+                      : <ChevronDown size={13} className="text-teal-500 dark:text-teal-400 shrink-0" />
+                    }
                     <span className="text-xs font-semibold text-zinc-700 dark:text-slate-300">
                       {item.phase.name}
                     </span>
                     <span className="text-xs font-mono text-zinc-400 dark:text-slate-500 ml-1">
                       {formatTimestamp(item.phase.timestamp)}–{formatTimestamp(item.endTimestamp)}
                     </span>
-                  </div>
+                  </button>
                 );
               }
 
@@ -223,7 +230,7 @@ export function MyTimeline({
                     else rowRefs.current.delete(row.timestamp);
                   }}
                   className={cn(
-                    "flex items-stretch gap-3 pl-3 pr-4 py-3 border-b border-zinc-100 dark:border-slate-800/60 last:border-b-0 border-l-[3px]",
+                    `flex items-stretch gap-3 pl-3 pr-4 border-b border-zinc-100 dark:border-slate-800/60 last:border-b-0 border-l-[3px] ${myPlanCompactView ? "py-1.5" : "py-3"}`,
                     stripeClass,
                     row.timestamp === currentTimestamp && "bg-teal-50 dark:bg-teal-950/40 ring-1 ring-inset ring-teal-300 dark:ring-teal-700"
                   )}
@@ -237,35 +244,11 @@ export function MyTimeline({
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-sm font-semibold text-zinc-800 dark:text-slate-100 leading-tight">
-                        {row.bossAbility}
-                      </span>
-                      {mechBadge && (
-                        <span
-                          className={cn(
-                            "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
-                            mechBadge.className
-                          )}
-                        >
-                          {mechBadge.label}
-                        </span>
-                      )}
-                      {dmgTypeIcon && (
-                        <Image
-                          src={dmgTypeIcon}
-                          alt={row.damageEvent!.type}
-                          width={16}
-                          height={16}
-                          className="shrink-0 opacity-70"
-                        />
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {abilityIds.map((aid) => {
-                        const ability = abilityById.get(aid);
-                        if (!ability) return null;
-                        if (myPlanIconsOnly) {
+                    {myPlanCompactView ? (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {abilityIds.map((aid) => {
+                          const ability = abilityById.get(aid);
+                          if (!ability) return null;
                           return (
                             <Image
                               key={aid}
@@ -277,24 +260,60 @@ export function MyTimeline({
                               title={ability.name}
                             />
                           );
-                        }
-                        return (
-                          <span
-                            key={aid}
-                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300"
-                          >
+                        })}
+                        <span className="text-sm font-semibold text-zinc-800 dark:text-slate-100 leading-tight">
+                          {row.bossAbility}
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-semibold text-zinc-800 dark:text-slate-100 leading-tight">
+                            {row.bossAbility}
+                          </span>
+                          {mechBadge && (
+                            <span
+                              className={cn(
+                                "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
+                                mechBadge.className
+                              )}
+                            >
+                              {mechBadge.label}
+                            </span>
+                          )}
+                          {dmgTypeIcon && (
                             <Image
-                              src={ability.iconPath}
-                              alt={ability.name}
+                              src={dmgTypeIcon}
+                              alt={row.damageEvent!.type}
                               width={16}
                               height={16}
-                              className="rounded-sm shrink-0"
+                              className="shrink-0 opacity-70"
                             />
-                            {ability.name}
-                          </span>
-                        );
-                      })}
-                    </div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {abilityIds.map((aid) => {
+                            const ability = abilityById.get(aid);
+                            if (!ability) return null;
+                            return (
+                              <span
+                                key={aid}
+                                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300"
+                              >
+                                <Image
+                                  src={ability.iconPath}
+                                  alt={ability.name}
+                                  width={16}
+                                  height={16}
+                                  className="rounded-sm shrink-0"
+                                />
+                                {ability.name}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
