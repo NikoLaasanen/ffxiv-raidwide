@@ -9,6 +9,7 @@ import type { JobAbilityRecord } from "@/types/job-ability";
 import { ChevronDown, ChevronRight, ListX, User } from "lucide-react";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { cn } from "@/lib/utils";
+import { JOB_ROLE_COLOR, ALL_JOBS } from "@/lib/jobs";
 import Image from "next/image";
 import { usePreferencesStore } from "@/store/preferences-store";
 
@@ -31,14 +32,14 @@ interface MyTimelineProps {
   phases: PhaseDivider[];
   assignments: MitigationAssignment[];
   abilitiesByJob: Record<JobAbbreviation, JobAbilityRecord[]>;
-  selectedJob: JobAbbreviation | null;
+  selectedJobs: JobAbbreviation[];
   currentTimestamp?: number | null;
   onTogglePhase?: (timestamp: number) => void;
 }
 
 type DisplayItem =
   | { kind: "phase"; phase: PhaseDivider; endTimestamp: number }
-  | { kind: "row"; row: TimelineRow; abilityIds: string[] };
+  | { kind: "row"; row: TimelineRow; abilityEntries: { job: JobAbbreviation; abilityId: string }[] };
 
 export function MyTimeline({
   players,
@@ -46,7 +47,7 @@ export function MyTimeline({
   phases,
   assignments,
   abilitiesByJob,
-  selectedJob,
+  selectedJobs,
   currentTimestamp,
   onTogglePhase,
 }: MyTimelineProps) {
@@ -60,38 +61,70 @@ export function MyTimeline({
     el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [currentTimestamp]);
 
-  const selectedPlayer = useMemo(
-    () => players.find((p) => p.job === selectedJob) ?? null,
-    [players, selectedJob]
+  const isMultiJob = selectedJobs.length > 1;
+
+  const sortedSelectedJobs = useMemo(
+    () => [...selectedJobs].sort((a, b) => ALL_JOBS.indexOf(a) - ALL_JOBS.indexOf(b)),
+    [selectedJobs]
   );
 
-  const playerAbilities = useMemo(
-    () => (selectedJob ? (abilitiesByJob[selectedJob] ?? []) : []),
-    [selectedJob, abilitiesByJob]
+  const selectedPlayers = useMemo(
+    () => players.filter((p) => sortedSelectedJobs.includes(p.job)),
+    [players, sortedSelectedJobs]
   );
+
+  const playerByJob = useMemo(
+    () => new Map(selectedPlayers.map((p) => [p.job, p])),
+    [selectedPlayers]
+  );
+
+  // Merged ability list, deduped by id, in role order
+  const playerAbilities = useMemo(() => {
+    if (sortedSelectedJobs.length === 0) return [];
+    const seen = new Set<string>();
+    const result: JobAbilityRecord[] = [];
+    for (const job of sortedSelectedJobs) {
+      for (const ab of abilitiesByJob[job] ?? []) {
+        if (!seen.has(ab.id)) {
+          seen.add(ab.id);
+          result.push(ab);
+        }
+      }
+    }
+    return result;
+  }, [sortedSelectedJobs, abilitiesByJob]);
 
   const abilityById = useMemo(
     () => new Map(playerAbilities.map((a) => [a.id, a])),
     [playerAbilities]
   );
 
+  // Track which job each assignment belongs to for display
   const myAssignments = useMemo(
-    () => (selectedPlayer ? assignments.filter((a) => a.playerId === selectedPlayer.id) : []),
-    [selectedPlayer, assignments]
+    () => assignments.filter((a) => selectedPlayers.some((p) => p.id === a.playerId)),
+    [selectedPlayers, assignments]
+  );
+
+  const playerIdToJob = useMemo(
+    () => new Map(selectedPlayers.map((p) => [p.id, p.job])),
+    [selectedPlayers]
   );
 
   const assignmentsByTimestamp = useMemo(() => {
-    const map = new Map<number, string[]>();
+    const map = new Map<number, { job: JobAbbreviation; abilityId: string }[]>();
     for (const a of myAssignments) {
+      const job = playerIdToJob.get(a.playerId);
+      if (!job) continue;
       const list = map.get(a.timestamp) ?? [];
-      list.push(a.abilityId);
+      list.push({ job, abilityId: a.abilityId });
       map.set(a.timestamp, list);
     }
+    for (const [ts, entries] of map) {
+      map.set(ts, entries.sort((a, b) => ALL_JOBS.indexOf(a.job) - ALL_JOBS.indexOf(b.job)));
+    }
     return map;
-  }, [myAssignments]);
+  }, [myAssignments, playerIdToJob]);
 
-  // Fight-relative severity thresholds — same formula as the FFLogs import route:
-  // average damage across visible rows; "high" ≥ 2× avg, "med" ≥ 1× avg.
   const { highThreshold, medThreshold } = useMemo(() => {
     const damages = timeline
       .filter((r) => !r.hidden && (r.damageEvent?.rawDamage ?? 0) > 0)
@@ -143,19 +176,18 @@ export function MyTimeline({
       items.push({
         kind: "row",
         row,
-        abilityIds: assignmentsByTimestamp.get(row.timestamp) ?? [],
+        abilityEntries: assignmentsByTimestamp.get(row.timestamp) ?? [],
       });
     }
     return items;
   }, [myRows, phases, timeline, assignmentsByTimestamp]);
 
-  const hasNoAssignments = selectedPlayer !== null && myRows.length === 0;
+  const hasNoAssignments = selectedPlayers.length > 0 && myRows.length === 0;
   const usedCount = playerAbilities.filter((a) => (usageByAbility.get(a.id) ?? 0) > 0).length;
 
   return (
     <div className="flex flex-col rounded-lg border border-zinc-200 dark:border-slate-800 overflow-hidden min-h-48 max-h-[calc(100vh-16rem)]">
-      {/* Main content */}
-      {!selectedJob ? (
+      {selectedJobs.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6 flex-1">
           <User size={32} className="text-zinc-300 dark:text-slate-600" />
           <div>
@@ -172,10 +204,12 @@ export function MyTimeline({
           <ListX size={32} className="text-zinc-300 dark:text-slate-600" />
           <div>
             <p className="text-sm font-medium text-zinc-600 dark:text-slate-300">
-              No assignments for {selectedJob} yet
+              No assignments for {selectedJobs.join(", ")} yet
             </p>
             <p className="text-xs text-zinc-400 dark:text-slate-500 mt-1">
-              Switch to Full view and assign mitigations to see them here
+              {isMultiJob
+                ? "Assign mitigations to see them here"
+                : "Switch to Full view and assign mitigations to see them here"}
             </p>
           </div>
         </div>
@@ -205,7 +239,7 @@ export function MyTimeline({
                 );
               }
 
-              const { row, abilityIds } = item;
+              const { row, abilityEntries } = item;
               const dmg = row.damageEvent?.rawDamage ?? 0;
               const sev = dmg >= highThreshold ? "high" : dmg >= medThreshold ? "med" : dmg > 0 ? "low" : null;
               const stripeClass =
@@ -246,19 +280,27 @@ export function MyTimeline({
                   <div className="flex-1 min-w-0">
                     {myPlanCompactView ? (
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {abilityIds.map((aid) => {
-                          const ability = abilityById.get(aid);
+                        {abilityEntries.map(({ job, abilityId }, i) => {
+                          const ability = abilityById.get(abilityId);
                           if (!ability) return null;
+                          const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
                           return (
-                            <Image
-                              key={aid}
-                              src={ability.iconPath}
-                              alt={ability.name}
-                              width={24}
-                              height={24}
-                              className="rounded"
-                              title={ability.name}
-                            />
+                            <span key={`${abilityId}-${i}`} className="relative inline-flex items-center">
+                              {isMultiJob && (
+                                <span
+                                  className="absolute -top-0.5 -left-0.5 w-2 h-2 rounded-full border border-white dark:border-slate-900 z-10"
+                                  style={{ backgroundColor: roleColor }}
+                                />
+                              )}
+                              <Image
+                                src={ability.iconPath}
+                                alt={ability.name}
+                                width={24}
+                                height={24}
+                                className="rounded"
+                                title={isMultiJob ? `${job}: ${ability.name}` : ability.name}
+                              />
+                            </span>
                           );
                         })}
                         <span className="text-sm font-semibold text-zinc-800 dark:text-slate-100 leading-tight">
@@ -292,14 +334,21 @@ export function MyTimeline({
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5 mt-2">
-                          {abilityIds.map((aid) => {
-                            const ability = abilityById.get(aid);
+                          {abilityEntries.map(({ job, abilityId }, i) => {
+                            const ability = abilityById.get(abilityId);
                             if (!ability) return null;
+                            const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
                             return (
                               <span
-                                key={aid}
+                                key={`${abilityId}-${i}`}
                                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300"
                               >
+                                {isMultiJob && (
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: roleColor }}
+                                  />
+                                )}
                                 <Image
                                   src={ability.iconPath}
                                   alt={ability.name}
@@ -307,6 +356,9 @@ export function MyTimeline({
                                   height={16}
                                   className="rounded-sm shrink-0"
                                 />
+                                {isMultiJob && (
+                                  <span className="text-[10px] font-semibold opacity-60">{job}</span>
+                                )}
                                 {ability.name}
                               </span>
                             );
@@ -320,64 +372,66 @@ export function MyTimeline({
             })}
           </div>
 
-          {/* Toolbox (collapsible) */}
-          <div className="border-t border-zinc-200 dark:border-slate-700 shrink-0">
-            <button
-              onClick={() => setToolboxOpen((o) => !o)}
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-slate-400 hover:text-zinc-700 dark:hover:text-slate-300 hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors"
-            >
-              {toolboxOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <span>My Toolbox</span>
-              <span className="ml-auto font-mono text-zinc-400 dark:text-slate-500">
-                {usedCount}/{playerAbilities.length} used
-              </span>
-            </button>
-            {toolboxOpen && (
-              <div className="flex flex-wrap gap-2 px-4 pb-4 pt-1 bg-zinc-50/50 dark:bg-slate-900/30">
-                {playerAbilities.length === 0 ? (
-                  <span className="text-xs text-zinc-400 dark:text-slate-500">
-                    No abilities loaded
-                  </span>
-                ) : (
-                  playerAbilities.map((ability) => {
-                    const uses = usageByAbility.get(ability.id) ?? 0;
-                    return (
-                      <div
-                        key={ability.id}
-                        className={cn(
-                          "flex flex-col items-center gap-1 rounded-lg p-2.5 border min-w-[3.5rem] text-center",
-                          uses > 0
-                            ? "border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/30"
-                            : "border-zinc-200 dark:border-slate-700 bg-zinc-50 dark:bg-slate-800/50 opacity-60"
-                        )}
-                      >
-                        <Image
-                          src={ability.iconPath}
-                          alt={ability.name}
-                          width={24}
-                          height={24}
-                          className="rounded"
-                        />
-                        <span className="text-[10px] font-medium text-zinc-600 dark:text-slate-400 max-w-[3.5rem] truncate leading-tight mt-0.5">
-                          {ability.name}
-                        </span>
-                        <span
+          {/* Toolbox (collapsible) — single job only */}
+          {!isMultiJob && (
+            <div className="border-t border-zinc-200 dark:border-slate-700 shrink-0">
+              <button
+                onClick={() => setToolboxOpen((o) => !o)}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-medium text-zinc-500 dark:text-slate-400 hover:text-zinc-700 dark:hover:text-slate-300 hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors"
+              >
+                {toolboxOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <span>My Toolbox</span>
+                <span className="ml-auto font-mono text-zinc-400 dark:text-slate-500">
+                  {usedCount}/{playerAbilities.length} used
+                </span>
+              </button>
+              {toolboxOpen && (
+                <div className="flex flex-wrap gap-2 px-4 pb-4 pt-1 bg-zinc-50/50 dark:bg-slate-900/30">
+                  {playerAbilities.length === 0 ? (
+                    <span className="text-xs text-zinc-400 dark:text-slate-500">
+                      No abilities loaded
+                    </span>
+                  ) : (
+                    playerAbilities.map((ability) => {
+                      const uses = usageByAbility.get(ability.id) ?? 0;
+                      return (
+                        <div
+                          key={ability.id}
                           className={cn(
-                            "text-xs font-bold font-mono",
+                            "flex flex-col items-center gap-1 rounded-lg p-2.5 border min-w-[3.5rem] text-center",
                             uses > 0
-                              ? "text-teal-600 dark:text-teal-400"
-                              : "text-zinc-400 dark:text-slate-500"
+                              ? "border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/30"
+                              : "border-zinc-200 dark:border-slate-700 bg-zinc-50 dark:bg-slate-800/50 opacity-60"
                           )}
                         >
-                          ×{uses}
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
+                          <Image
+                            src={ability.iconPath}
+                            alt={ability.name}
+                            width={24}
+                            height={24}
+                            className="rounded"
+                          />
+                          <span className="text-[10px] font-medium text-zinc-600 dark:text-slate-400 max-w-[3.5rem] truncate leading-tight mt-0.5">
+                            {ability.name}
+                          </span>
+                          <span
+                            className={cn(
+                              "text-xs font-bold font-mono",
+                              uses > 0
+                                ? "text-teal-600 dark:text-teal-400"
+                                : "text-zinc-400 dark:text-slate-500"
+                            )}
+                          >
+                            ×{uses}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

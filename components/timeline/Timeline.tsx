@@ -8,7 +8,7 @@ import { ChevronDown, ChevronRight, Play, Pause, RotateCcw, ExternalLink } from 
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { PlayerCastEvent } from "@/types/fflogs";
-import { JOB_NAMES, JOB_GROUPS, ALL_JOBS } from "@/lib/jobs";
+import { JOB_NAMES, JOB_GROUPS, ALL_JOBS, JOB_ROLE_COLOR } from "@/lib/jobs";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { computeAssignments } from "@/lib/compute-assignments";
 import { cn } from "@/lib/utils";
@@ -58,13 +58,6 @@ type DisplayItem =
 
 const TYPE_CYCLE: DamageType[] = ["magical", "physical", "unique"];
 
-const JOB_ROLE_COLOR: Partial<Record<JobAbbreviation, string>> = {
-  PLD:'#60a5fa', WAR:'#60a5fa', DRK:'#60a5fa', GNB:'#60a5fa',
-  WHM:'#4ade80', SCH:'#4ade80', AST:'#4ade80', SGE:'#4ade80',
-  DRG:'#f472b6', MNK:'#f472b6', NIN:'#f472b6', SAM:'#f472b6', RPR:'#f472b6', VPR:'#f472b6',
-  BRD:'#fbbf24', MCH:'#fbbf24', DNC:'#fbbf24',
-  BLM:'#c084fc', SMN:'#c084fc', RDM:'#c084fc', PCT:'#c084fc',
-};
 
 const DAMAGE_TYPE_ICON: Record<DamageType, string> = {
   magical:  "/icons/MagicalDamage.png",
@@ -602,6 +595,14 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     [players]
   );
   const [selectedJobs, setSelectedJobs] = useState<JobAbbreviation[]>(() => allJobs);
+  const [myPlanEditJobs, setMyPlanEditJobs] = useState<JobAbbreviation[]>(() => allJobs);
+  useEffect(() => {
+    setMyPlanEditJobs((prev) => {
+      const existing = new Set(prev);
+      const missing = allJobs.filter((j) => !existing.has(j));
+      return missing.length ? [...prev, ...missing] : prev;
+    });
+  }, [allJobs]);
   const { abilitiesByJob, isLoading } = useJobAbilities(allJobs);
   const initializedRef = useRef(!!initialAssignments?.length);
   const [assignments, setAssignments] = useState<MitigationAssignment[]>(
@@ -1049,33 +1050,31 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
         <div className="flex items-center justify-between gap-2">
           {headerLeft ?? <div />}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Full timeline / My plan toggle — desktop only, view mode */}
-            {readOnly && (
-              <div className="hidden md:flex rounded-md overflow-hidden border border-zinc-200 dark:border-slate-700 text-xs font-medium">
-                <button
-                  onClick={() => setTimelineViewMode("full")}
-                  className={cn(
-                    "px-3 py-1.5 transition-colors",
-                    timelineViewMode === "full"
-                      ? "bg-teal-600 dark:bg-teal-700 text-white"
-                      : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
-                  )}
-                >
-                  Full timeline
-                </button>
-                <button
-                  onClick={() => setTimelineViewMode("my")}
-                  className={cn(
-                    "px-3 py-1.5 transition-colors border-l border-zinc-200 dark:border-slate-700",
-                    timelineViewMode === "my"
-                      ? "bg-teal-600 dark:bg-teal-700 text-white"
-                      : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
-                  )}
-                >
-                  My plan
-                </button>
-              </div>
-            )}
+            {/* Full timeline / My plan toggle — desktop only */}
+            <div className="hidden md:flex rounded-md overflow-hidden border border-zinc-200 dark:border-slate-700 text-xs font-medium">
+              <button
+                onClick={() => setTimelineViewMode("full")}
+                className={cn(
+                  "px-3 py-1.5 transition-colors",
+                  timelineViewMode === "full"
+                    ? "bg-teal-600 dark:bg-teal-700 text-white"
+                    : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
+                )}
+              >
+                Full timeline
+              </button>
+              <button
+                onClick={() => setTimelineViewMode("my")}
+                className={cn(
+                  "px-3 py-1.5 transition-colors border-l border-zinc-200 dark:border-slate-700",
+                  timelineViewMode === "my"
+                    ? "bg-teal-600 dark:bg-teal-700 text-white"
+                    : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
+                )}
+              >
+                My plan
+              </button>
+            </div>
             {readOnly && comparisonLabel && (
               <div className="flex items-center gap-1.5 rounded-md bg-zinc-100 dark:bg-slate-800 px-2 py-1 text-xs text-zinc-600 dark:text-slate-400">
                 <span className="font-medium">Comparing:</span>
@@ -1116,31 +1115,77 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           </div>
         </div>
 
-        {/* Full-width Full/My plan toggle — mobile only, view mode */}
-        {readOnly && (
-          <div className="flex md:hidden rounded-md overflow-hidden border border-zinc-200 dark:border-slate-700 text-xs font-medium">
-            <button
-              onClick={() => setTimelineViewMode("full")}
-              className={cn(
-                "flex-1 py-2 transition-colors",
-                timelineViewMode === "full"
-                  ? "bg-teal-600 dark:bg-teal-700 text-white font-semibold"
-                  : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400"
-              )}
-            >
-              Full timeline
-            </button>
-            <button
-              onClick={() => setTimelineViewMode("my")}
-              className={cn(
-                "flex-1 py-2 transition-colors border-l border-zinc-200 dark:border-slate-700",
-                timelineViewMode === "my"
-                  ? "bg-teal-600 dark:bg-teal-700 text-white font-semibold"
-                  : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400"
-              )}
-            >
-              My plan
-            </button>
+        {/* Full-width Full/My plan toggle — mobile only */}
+        <div className="flex md:hidden rounded-md overflow-hidden border border-zinc-200 dark:border-slate-700 text-xs font-medium">
+          <button
+            onClick={() => setTimelineViewMode("full")}
+            className={cn(
+              "flex-1 py-2 transition-colors",
+              timelineViewMode === "full"
+                ? "bg-teal-600 dark:bg-teal-700 text-white font-semibold"
+                : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400"
+            )}
+          >
+            Full timeline
+          </button>
+          <button
+            onClick={() => setTimelineViewMode("my")}
+            className={cn(
+              "flex-1 py-2 transition-colors border-l border-zinc-200 dark:border-slate-700",
+              timelineViewMode === "my"
+                ? "bg-teal-600 dark:bg-teal-700 text-white font-semibold"
+                : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400"
+            )}
+          >
+            My plan
+          </button>
+        </div>
+
+        {/* Job multiselect — edit mode, My plan view */}
+        {!readOnly && timelineViewMode === "my" && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 px-3 py-2 bg-zinc-50 dark:bg-slate-900">
+            <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 shrink-0">
+              Showing
+            </span>
+            <span className={cn(
+              "inline-flex items-center h-5 px-1.5 rounded-full border text-[10.5px] font-semibold font-mono shrink-0",
+              myPlanEditJobs.length === allJobs.length
+                ? "bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400"
+                : "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-500 dark:text-slate-400"
+            )}>
+              {myPlanEditJobs.length}/{allJobs.length}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {allJobs.map((job) => {
+                const active = myPlanEditJobs.includes(job);
+                const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                return (
+                  <button
+                    key={job}
+                    onClick={() => setMyPlanEditJobs((prev) =>
+                      active ? prev.filter((j) => j !== job) : [...prev, job]
+                    )}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border transition-colors",
+                      active
+                        ? "bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500"
+                        : "bg-white dark:bg-slate-900 border-zinc-200 dark:border-slate-700 text-zinc-400 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-slate-600"
+                    )}
+                  >
+                    <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: active ? roleColor : "#94a3b8" }} />
+                    {job}
+                  </button>
+                );
+              })}
+            </div>
+            {myPlanEditJobs.length < allJobs.length && (
+              <button
+                onClick={() => setMyPlanEditJobs(allJobs)}
+                className="text-xs text-teal-600 dark:text-teal-400 hover:underline shrink-0"
+              >
+                All
+              </button>
+            )}
           </div>
         )}
 
@@ -1251,7 +1296,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           </div>
         )}
 
-        {(!readOnly || timelineViewMode === "full") && (
+        {timelineViewMode === "full" && (
         <div ref={scrollContainerRef} className="relative overflow-auto min-h-48 max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
           {isLoading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-950/70 backdrop-blur-[2px]">
@@ -1418,15 +1463,15 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           </table>
         </div>
         )}
-        {readOnly && timelineViewMode === "my" && (
+        {timelineViewMode === "my" && (
           <MyTimeline
             players={players}
             timeline={localTimeline}
             phases={localPhases}
             assignments={assignments}
             abilitiesByJob={abilitiesByJob}
-            selectedJob={myTimelinePlayerJob}
-            currentTimestamp={myNextRow?.timestamp ?? null}
+            selectedJobs={readOnly ? (myTimelinePlayerJob ? [myTimelinePlayerJob] : []) : myPlanEditJobs}
+            currentTimestamp={readOnly ? (myNextRow?.timestamp ?? null) : null}
             onTogglePhase={stableTogglePhase}
           />
         )}

@@ -19,6 +19,14 @@ export const JOB_NAMES: Record<JobAbbreviation, string> = {
 
 export const ALL_JOBS: JobAbbreviation[] = JOB_GROUPS.flatMap((g) => g.jobs);
 
+export const JOB_ROLE_COLOR: Partial<Record<JobAbbreviation, string>> = {
+  PLD:'#60a5fa', WAR:'#60a5fa', DRK:'#60a5fa', GNB:'#60a5fa',
+  WHM:'#4ade80', SCH:'#4ade80', AST:'#4ade80', SGE:'#4ade80',
+  DRG:'#f472b6', MNK:'#f472b6', NIN:'#f472b6', SAM:'#f472b6', RPR:'#f472b6', VPR:'#f472b6',
+  BRD:'#fbbf24', MCH:'#fbbf24', DNC:'#fbbf24',
+  BLM:'#c084fc', SMN:'#c084fc', RDM:'#c084fc', PCT:'#c084fc',
+};
+
 /** FFLogs uses camelCase job identifiers (e.g. "DarkKnight") rather than abbreviations. */
 export const FFLOGS_JOB_MAP: Record<string, JobAbbreviation> = {
   Paladin: "PLD", Warrior: "WAR", DarkKnight: "DRK", Gunbreaker: "GNB",
