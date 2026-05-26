@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 
 export type AbilityTarget = "self" | "party" | "single";
-export type AbilityType = "mitigation" | "utility" | "buff" | "interrupt";
+export type AbilityType = "mitigation" | "utility" | "buff" | "interrupt" | "cleanse";
 export type TimelineViewMode = "full" | "my";
 
 export interface UserPreferences {
