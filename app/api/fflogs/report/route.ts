@@ -1,126 +1,35 @@
-import { fflogsGraphQL } from "@/lib/fflogs-client";
 import type {
   FFLogsMetaResponse,
-  FFLogsEventsResponse,
   FFLogsRawEvent,
   FFLogsActor,
   FFLogsAbility,
   FFLogsFight,
   PlayerCastEvent,
 } from "@/types/fflogs";
-import type { Player } from "@/types/player";
-import type { TimelineRow, PlayerMistakeState, MechanicType } from "@/types/timeline";
+import type { Player, PhaseDivider } from "@/types/player";
+import type { TimelineRow, PlayerMistakeState } from "@/types/timeline";
 import type { DamageType } from "@/types/common";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
+import { fflogsGraphQL } from "@/lib/fflogs-client";
 import { FFLOGS_JOB_MAP } from "@/lib/jobs";
-import { isAutoAttack } from "@/lib/is-auto-attack";
+import { adminDb } from "@/lib/firebase-admin";
+import {
+  FIGHT_META_QUERY,
+  ALL_FIGHTS_QUERY,
+  fetchAllEvents,
+  groupBossHits,
+  buildBaseTimeline,
+  classifyMechanic,
+  computeTankbusterThreshold,
+  ENRAGE_DAMAGE_THRESHOLD,
+  InternalRow,
+} from "@/lib/fflogs-timeline";
 
-const FIGHT_META_QUERY = `
-  query FightMeta($code: String!, $fightID: Int!) {
-    reportData {
-      report(code: $code) {
-        fights(fightIDs: [$fightID]) { id name encounterID startTime endTime kill friendlyPlayers }
-        masterData {
-          actors { id name type subType }
-          abilities { gameID name type }
-        }
-      }
-    }
-  }
-`;
-
-const EVENTS_QUERY = `
-  query Events($code: String!, $fightID: Int!, $startTime: Float!, $dataType: EventDataType!) {
-    reportData {
-      report(code: $code) {
-        events(fightIDs: [$fightID], startTime: $startTime, dataType: $dataType) {
-          data
-          nextPageTimestamp
-        }
-      }
-    }
-  }
-`;
-
-const ALL_FIGHTS_QUERY = `
-  query AllFights($code: String!) {
-    reportData {
-      report(code: $code) {
-        fights { id name encounterID startTime endTime kill friendlyPlayers }
-        masterData {
-          actors { id name type subType }
-          abilities { gameID name type }
-        }
-      }
-    }
-  }
-`;
-
-async function fetchAllEvents(
-  code: string,
-  fightID: number,
-  dataType: string
-): Promise<FFLogsRawEvent[]> {
-  const events: FFLogsRawEvent[] = [];
-  let startTime = 0;
-
-  while (true) {
-    const data = await fflogsGraphQL<FFLogsEventsResponse>(EVENTS_QUERY, {
-      code,
-      fightID,
-      startTime,
-      dataType,
-    });
-
-    const page = data.reportData.report.events;
-    const rawData = typeof page.data === "string" ? JSON.parse(page.data) : page.data;
-    events.push(...(rawData as FFLogsRawEvent[]));
-
-    if (page.nextPageTimestamp === null || page.nextPageTimestamp === undefined) break;
-    startTime = page.nextPageTimestamp;
-  }
-
-  return events;
-}
-
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0
-    ? sorted[mid]
-    : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
-}
-
-function mapDamageType(fflogsType: number): DamageType {
-  if (fflogsType & 64) return "magical";
-  if (fflogsType & 1024) return "unique";
-  return "magical";
-}
-
-const TANK_JOBS = new Set<JobAbbreviation>(["PLD", "WAR", "DRK", "GNB"]);
-const ENRAGE_DAMAGE_THRESHOLD = 1_000_000;
-
-type InternalRow = TimelineRow & { _targetIds: number[] };
-
-function classifyMechanic(
-  targetIds: number[],
-  rawDamage: number | undefined,
-  playerJobById: Map<number, JobAbbreviation>,
-  tankbusterThreshold: number
-): MechanicType {
-  const hitCount = targetIds.length;
-  if (hitCount === 0 || rawDamage === undefined) return "unknown";
-  if (hitCount > 2) return "party";
-  const allAreTanks = targetIds.every((id) => {
-    const job = playerJobById.get(id);
-    return job !== undefined && TANK_JOBS.has(job);
-  });
-  if (allAreTanks && rawDamage >= tankbusterThreshold) return "tankbuster";
-  if (hitCount === 1) return "single";
-  return "unknown";
-}
-
-function findClosestRow(timeline: InternalRow[], timestamp: number, windowMs: number): InternalRow | null {
+function findClosestRow(
+  timeline: InternalRow[],
+  timestamp: number,
+  windowMs: number
+): InternalRow | null {
   let bestNonHidden: InternalRow | null = null;
   let minNonHidden = Infinity;
   let bestAny: InternalRow | null = null;
@@ -148,113 +57,17 @@ function normalizeTimeline(
   playerJobById: Map<number, JobAbbreviation>,
   rawCasts: FFLogsRawEvent[]
 ): TimelineRow[] {
-  const normalize = (e: FFLogsRawEvent): FFLogsRawEvent => ({
-    ...e,
-    timestamp: e.timestamp - fightStartTime,
-  });
-  const damageTaken = rawDamageTaken.map(normalize);
-  const deaths = rawDeaths.map(normalize);
-  const debuffs = rawDebuffs.map(normalize);
-
-  const SKIPPED_ABILITIES = new Set(["Combined DoTs", "Sustained Damage", "Explosion", "Unmitigated Explosion"]);
-
-  const bossHits = damageTaken
-    .filter((e) => {
-      if (!bossActorIds.has(e.sourceID) || e.hitType === 2) return false;
-      const name = abilityByGameId.get(e.abilityGameID)?.name;
-      return !name || !SKIPPED_ABILITIES.has(name);
-    })
-    .sort((a, b) => a.timestamp - b.timestamp);
-
-  const groups: FFLogsRawEvent[][] = [];
-  let currentGroup: FFLogsRawEvent[] = [];
-  let groupStart = -1;
-  let groupAbilityId = -1;
-
-  for (const event of bossHits) {
-    const newAbility = event.abilityGameID !== groupAbilityId;
-    const newWindow = event.timestamp - groupStart > 500;
-
-    if (newAbility || newWindow) {
-      if (currentGroup.length > 0) groups.push(currentGroup);
-      currentGroup = [event];
-      groupStart = event.timestamp;
-      groupAbilityId = event.abilityGameID;
-    } else {
-      currentGroup.push(event);
-    }
-  }
-  if (currentGroup.length > 0) groups.push(currentGroup);
+  const groups = groupBossHits(rawDamageTaken, bossActorIds, abilityByGameId, fightStartTime);
+  const baseTimeline = buildBaseTimeline(groups, abilityByGameId, actorById);
 
   const playerMistakesBase = (): Record<string, PlayerMistakeState> =>
     Object.fromEntries(
       players.map((p) => [p.id, { dead: false, damageDown: false, weakness: false, brinkOfDeath: false, deadGray: false }])
     );
 
-  const rawTimeline: InternalRow[] = groups.map((group) => {
-    const first = group[0];
-    const abilityInfo = abilityByGameId.get(first.abilityGameID);
-    const bossAbilityName = abilityInfo?.name ?? `Unknown (${first.abilityGameID})`;
-    const allDamages = group
-      .map((e) => e.unmitigatedAmount ?? e.amount ?? 0)
-      .filter((d) => d > 0);
-    const rawDamage = allDamages.length > 0 ? median(allDamages) : 0;
+  const timeline: InternalRow[] = baseTimeline.map((r) => ({ ...r, playerMistakes: playerMistakesBase() }));
 
-    return {
-      timestamp: first.timestamp,
-      bossAbility: bossAbilityName,
-      sourceName: actorById.get(first.sourceID)?.name,
-      damageEvent:
-        rawDamage > 0
-          ? { rawDamage, allDamages, type: abilityInfo ? mapDamageType(abilityInfo.type) : "magical" }
-          : undefined,
-      playerMistakes: playerMistakesBase(),
-      hidden: isAutoAttack(bossAbilityName),
-      _targetIds: group.map((e) => e.targetID),
-    };
-  });
-
-  const sortedRaw = rawTimeline.sort((a, b) => a.timestamp - b.timestamp);
-  const timeline: InternalRow[] = [];
-  for (const row of sortedRaw) {
-    let mergeTarget: InternalRow | null = null;
-    for (let i = timeline.length - 1; i >= 0; i--) {
-      const r = timeline[i];
-      if (row.timestamp - r.timestamp > 1000) break;
-      if (r.bossAbility === row.bossAbility) {
-        mergeTarget = r;
-        break;
-      }
-    }
-
-    if (mergeTarget) {
-      if (row.damageEvent && mergeTarget.damageEvent) {
-        mergeTarget.damageEvent.allDamages.push(...row.damageEvent.allDamages);
-        mergeTarget.damageEvent.rawDamage = median(mergeTarget.damageEvent.allDamages);
-      } else if (row.damageEvent) {
-        mergeTarget.damageEvent = { ...row.damageEvent, allDamages: [...row.damageEvent.allDamages] };
-      }
-      mergeTarget._targetIds.push(...row._targetIds);
-    } else {
-      timeline.push({
-        ...row,
-        damageEvent: row.damageEvent
-          ? { ...row.damageEvent, allDamages: [...row.damageEvent.allDamages] }
-          : undefined,
-        _targetIds: [...row._targetIds],
-      });
-    }
-  }
-
-  // Compute fight-relative tank buster threshold (2× average damage across non-hidden rows)
-  const visibleDamages = timeline
-    .filter((r) => !r.hidden && r.damageEvent?.rawDamage)
-    .map((r) => r.damageEvent!.rawDamage);
-  const avgDamage =
-    visibleDamages.length > 0
-      ? visibleDamages.reduce((a, b) => a + b, 0) / visibleDamages.length
-      : 0;
-  const tankbusterThreshold = avgDamage * 2;
+  const tankbusterThreshold = computeTankbusterThreshold(baseTimeline);
 
   for (const row of timeline) {
     row.mechanicType = classifyMechanic(row._targetIds, row.damageEvent?.rawDamage, playerJobById, tankbusterThreshold);
@@ -265,6 +78,9 @@ function normalizeTimeline(
   }
 
   const playerIdSet = new Set(players.map((p) => p.id));
+  const normalize = (e: FFLogsRawEvent): FFLogsRawEvent => ({ ...e, timestamp: e.timestamp - fightStartTime });
+  const deaths = rawDeaths.map(normalize);
+  const debuffs = rawDebuffs.map(normalize);
 
   const playerCastMap = new Map<string, number[]>();
   for (const event of rawCasts) {
@@ -438,8 +254,8 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "Fight not found in report" }, { status: 404 });
     }
 
-    const actors: FFLogsActor[] = report.masterData.actors;
-    const abilities: FFLogsAbility[] = report.masterData.abilities;
+    const actors = report.masterData.actors;
+    const abilities = report.masterData.abilities;
 
     const abilityByGameId = new Map(abilities.map((a) => [a.gameID, a]));
     const actorById = new Map(actors.map((a) => [a.id, a]));
@@ -493,7 +309,46 @@ export async function POST(request: Request): Promise<Response> {
         timestamp: e.timestamp - fight.startTime,
       }));
 
-    return Response.json({ reportCode, fight, players, timeline, casts });
+    let encounterId: string | null = null;
+    let phases: PhaseDivider[] = [];
+
+    const fightNameLower = fight.name.toLowerCase();
+    const encounterSnap = await adminDb.collection("encounters").get();
+    const matchedDoc = encounterSnap.docs.find(
+      (d) => (d.data().name as string).toLowerCase() === fightNameLower
+    );
+
+    if (matchedDoc) {
+      const enc = matchedDoc.data();
+      encounterId = matchedDoc.id;
+      phases = (enc.phases ?? []) as PhaseDivider[];
+
+      const encounterRows = (enc.timeline ?? []) as TimelineRow[];
+      type AbilityMeta = { mechanicType?: TimelineRow["mechanicType"]; cleanse: boolean; interrupt: boolean; damageType?: DamageType };
+      const metaByAbility = new Map<string, AbilityMeta>();
+      for (const row of encounterRows) {
+        const key = row.bossAbility.toLowerCase();
+        if (!metaByAbility.has(key)) {
+          metaByAbility.set(key, {
+            mechanicType: row.mechanicType,
+            cleanse: row.cleanse ?? false,
+            interrupt: row.interrupt ?? false,
+            damageType: row.damageEvent?.type,
+          });
+        }
+      }
+
+      for (const row of timeline) {
+        const meta = metaByAbility.get(row.bossAbility.toLowerCase());
+        if (!meta) continue;
+        if (meta.mechanicType) row.mechanicType = meta.mechanicType;
+        row.cleanse = meta.cleanse;
+        row.interrupt = meta.interrupt;
+        if (meta.damageType && row.damageEvent) row.damageEvent = { ...row.damageEvent, type: meta.damageType };
+      }
+    }
+
+    return Response.json({ reportCode, fight, players, timeline, casts, encounterId, phases });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return Response.json({ error: message }, { status: 500 });

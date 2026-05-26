@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import type { Plan } from "@/types/plan";
 import type { MitigationAssignment } from "@/types/timeline";
-import type { PhaseDivider } from "@/types/player";
+import type { PhaseDivider, Player } from "@/types/player";
 
 export default function PlanPage({
   params,
@@ -31,6 +31,8 @@ export default function PlanPage({
   const handleAssignmentsChange = useCallback((a: MitigationAssignment[]) => setCurrentAssignments(a), []);
   const [currentPhases, setCurrentPhases] = useState<PhaseDivider[]>([]);
   const handlePhasesChange = useCallback((p: PhaseDivider[]) => setCurrentPhases(p), []);
+  const [currentPlayers, setCurrentPlayers] = useState<Player[]>([]);
+  const handlePlayersChange = useCallback((p: Player[]) => setCurrentPlayers(p), []);
 
   // Load plan from Firebase if the store doesn't already have it
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function PlanPage({
     setSaving(true);
     setSaved(false);
     try {
-      const updated: Plan = { ...storePlan, updatedAt: Date.now(), assignments: currentAssignments, phases: currentPhases };
+      const updated: Plan = { ...storePlan, updatedAt: Date.now(), assignments: currentAssignments, phases: currentPhases, players: currentPlayers };
       await updatePlan(updated);
       setPlan(updated);
       setSaved(true);
@@ -104,6 +106,7 @@ export default function PlanPage({
         initialAssignments={storePlan.assignments ?? []}
         onAssignmentsChange={handleAssignmentsChange}
         onPhasesChange={handlePhasesChange}
+        onPlayersChange={handlePlayersChange}
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}

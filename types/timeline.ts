@@ -32,6 +32,8 @@ export interface TimelineRow {
   hidden: boolean;
   sourceName?: string;
   mechanicType?: MechanicType;
+  cleanse?: boolean;
+  interrupt?: boolean;
 }
 
 export interface MitigationAssignment {

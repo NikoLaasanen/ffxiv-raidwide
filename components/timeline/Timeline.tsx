@@ -36,6 +36,7 @@ interface TimelineProps {
   initialAssignments?: MitigationAssignment[];
   onAssignmentsChange?: (a: MitigationAssignment[]) => void;
   onPhasesChange?: (phases: PhaseDivider[]) => void;
+  onPlayersChange?: (players: Player[]) => void;
   readOnly?: boolean;
   viewLinkId?: string;
   title?: string;
@@ -283,7 +284,31 @@ const TimelineBodyRow = memo(
             </button>
           )}
         </td>
-        <td className="px-4 py-2 font-medium">{row.bossAbility}</td>
+        <td className="px-4 py-2 font-medium">
+          <span className="flex items-center gap-1.5 flex-wrap">
+            {row.bossAbility}
+            {row.cleanse && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 cursor-default">
+                    Cleanse
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right">Players should cleanse this debuff</TooltipContent>
+              </Tooltip>
+            )}
+            {row.interrupt && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 cursor-default">
+                    Interrupt
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right">This ability can be interrupted</TooltipContent>
+              </Tooltip>
+            )}
+          </span>
+        </td>
         {showMistakesColumn && (
           <td className="px-3 py-2 text-center">
             {hasMistakeSummary ? (
@@ -552,7 +577,7 @@ const TimelineBodyRow = memo(
 
 const EMPTY_PHASES: PhaseDivider[] = [];
 
-export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, readOnly, viewLinkId, title, encounterId, raidplanLink, headerLeft }: TimelineProps) {
+export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, onPlayersChange, readOnly, viewLinkId, title, encounterId, raidplanLink, headerLeft }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -587,17 +612,34 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     }))
   );
 
+  const [localPlayers, setLocalPlayers] = useState<Player[]>(players);
+  useEffect(() => setLocalPlayers(players), [players]);
+  const onPlayersChangeRef = useRef(onPlayersChange);
+  useLayoutEffect(() => { onPlayersChangeRef.current = onPlayersChange; });
+  useEffect(() => { onPlayersChangeRef.current?.(localPlayers); }, [localPlayers]);
+
   const allJobs = useMemo(
     () =>
-      [...new Set(players.map((p) => p.job))].sort(
+      [...new Set(localPlayers.map((p) => p.job))].sort(
         (a, b) => ALL_JOBS.indexOf(a) - ALL_JOBS.indexOf(b)
       ),
-    [players]
+    [localPlayers]
   );
   const [selectedJobs, setSelectedJobs] = useState<JobAbbreviation[]>(() => allJobs);
   const [myPlanEditJobs, setMyPlanEditJobs] = useState<JobAbbreviation[]>(() => allJobs);
   useEffect(() => {
     setMyPlanEditJobs((prev) => {
+      const existing = new Set(prev);
+      const missing = allJobs.filter((j) => !existing.has(j));
+      return missing.length ? [...prev, ...missing] : prev;
+    });
+  }, [allJobs]);
+  const [myPlanViewJobs, setMyPlanViewJobs] = useState<JobAbbreviation[]>(() => {
+    if (myPlanDefaultJob && allJobs.includes(myPlanDefaultJob)) return [myPlanDefaultJob];
+    return allJobs.length ? [allJobs[0]] : [];
+  });
+  useEffect(() => {
+    setMyPlanViewJobs((prev) => {
       const existing = new Set(prev);
       const missing = allJobs.filter((j) => !existing.has(j));
       return missing.length ? [...prev, ...missing] : prev;
@@ -619,8 +661,6 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   const onPhasesChangeRef = useRef(onPhasesChange);
   useLayoutEffect(() => { onPhasesChangeRef.current = onPhasesChange; });
   useEffect(() => { onPhasesChangeRef.current?.(localPhases); }, [localPhases]);
-
-  const myRoleColor = myTimelinePlayerJob ? (JOB_ROLE_COLOR[myTimelinePlayerJob] ?? "#94a3b8") : "#94a3b8";
 
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -660,7 +700,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
 
   const { myCurrentRow, myNextRow } = useMemo(() => {
     if (!myTimelinePlayerJob) return { myCurrentRow: null, myNextRow: null };
-    const player = players.find((p) => p.job === myTimelinePlayerJob) ?? null;
+    const player = localPlayers.find((p) => p.job === myTimelinePlayerJob) ?? null;
     if (!player) return { myCurrentRow: null, myNextRow: null };
     const ts = new Set(assignments.filter((a) => a.playerId === player.id).map((a) => a.timestamp));
     const assigned = localTimeline.filter((r) => !r.hidden && ts.has(r.timestamp));
@@ -671,11 +711,11 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     }
     const next = assigned.find((r) => r.timestamp > elapsedMs) ?? null;
     return { myCurrentRow: current, myNextRow: next };
-  }, [myTimelinePlayerJob, players, assignments, localTimeline, elapsedMs]);
+  }, [myTimelinePlayerJob, localPlayers, assignments, localTimeline, elapsedMs]);
 
   const myNextRowAbilities = useMemo(() => {
     if (!myNextRow || !myTimelinePlayerJob) return [];
-    const player = players.find((p) => p.job === myTimelinePlayerJob);
+    const player = localPlayers.find((p) => p.job === myTimelinePlayerJob);
     if (!player) return [];
     const abilityIds = new Set(
       assignments.filter((a) => a.playerId === player.id && a.timestamp === myNextRow.timestamp).map((a) => a.abilityId)
@@ -686,11 +726,11 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       seen.add(ab.id);
       return true;
     });
-  }, [myNextRow, myTimelinePlayerJob, players, assignments, abilitiesByJob]);
+  }, [myNextRow, myTimelinePlayerJob, localPlayers, assignments, abilitiesByJob]);
 
   const myNextRowFollowups = useMemo(() => {
     if (!myNextRow || !myTimelinePlayerJob) return [];
-    const player = players.find((p) => p.job === myTimelinePlayerJob);
+    const player = localPlayers.find((p) => p.job === myTimelinePlayerJob);
     if (!player) return [];
     const cutoff = myNextRow.timestamp + 5000;
     const byTimestamp = new Map<number, Set<string>>();
@@ -715,13 +755,19 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       });
       return { row, abilities };
     }).filter((f) => f.abilities.length > 0);
-  }, [myNextRow, myTimelinePlayerJob, players, assignments, localTimeline, abilitiesByJob]);
+  }, [myNextRow, myTimelinePlayerJob, localPlayers, assignments, localTimeline, abilitiesByJob]);
 
   useEffect(() => {
-    if (myTimelinePlayerJob === null && myPlanDefaultJob !== null && allJobs.includes(myPlanDefaultJob)) {
-      setMyTimelinePlayerJob(myPlanDefaultJob);
+    if (readOnly) setMyTimelinePlayerJob(myPlanViewJobs[0] ?? null);
+  }, [readOnly, myPlanViewJobs, setMyTimelinePlayerJob]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#my-plan") {
+      setTimelineViewMode("my");
     }
-  }, [myTimelinePlayerJob, myPlanDefaultJob, allJobs, setMyTimelinePlayerJob]);
+    // setTimelineViewMode is a stable Zustand setter — run only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function addPhase(atTimestamp: number) {
     setLocalPhases((prev) => {
@@ -740,20 +786,20 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   }, []);
 
   const playerByJob = useMemo(
-    () => new Map(players.map((p) => [p.job, p])),
-    [players]
+    () => new Map(localPlayers.map((p) => [p.job, p])),
+    [localPlayers]
   );
 
   const { worstMistakeByPlayer, playerMistakeTimestamps, playerStatusRanges } = useMemo(() => {
     const worst = new Map<string, "death" | "damageDown">();
     const timestamps = new Map<string, { deaths: number[]; damageDowns: number[] }>();
     const statusRanges = new Map<string, PlayerRanges>();
-    for (const player of players) {
+    for (const player of localPlayers) {
       timestamps.set(player.id, { deaths: [], damageDowns: [] });
       statusRanges.set(player.id, { deadRows: [], weaknesses: [], brinks: [], damageDowns: [] });
     }
     for (const row of timeline) {
-      for (const player of players) {
+      for (const player of localPlayers) {
         const m = row.playerMistakes[player.id];
         if (!m) continue;
         if (m.dead) { worst.set(player.id, "death"); }
@@ -774,7 +820,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       }
     }
     return { worstMistakeByPlayer: worst, playerMistakeTimestamps: timestamps, playerStatusRanges: statusRanges };
-  }, [timeline, players]);
+  }, [timeline, localPlayers]);
 
   const comparisonAssignments = usePlanStore((s) => s.comparisonAssignments);
   const comparisonLabel = usePlanStore((s) => s.comparisonLabel);
@@ -840,14 +886,20 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   useEffect(() => {
     if (!initializedRef.current && casts?.length && !isLoading) {
       initializedRef.current = true;
-      setAssignments(computeAssignments(casts, players, abilitiesByJob, timeline));
+      setAssignments(computeAssignments(casts, localPlayers, abilitiesByJob, timeline));
     }
-  }, [casts, isLoading, players, abilitiesByJob, timeline]);
+  }, [casts, isLoading, localPlayers, abilitiesByJob, timeline]);
 
-  const toggleJob = (job: JobAbbreviation) =>
-    setSelectedJobs((prev) =>
-      prev.includes(job) ? prev.filter((j) => j !== job) : [...prev, job]
-    );
+  function toggleJob(job: JobAbbreviation) {
+    if (selectedJobs.includes(job)) {
+      setSelectedJobs((prev) => prev.filter((j) => j !== job));
+    } else {
+      if (!localPlayers.some((p) => p.job === job)) {
+        setLocalPlayers((prev) => [...prev, { id: `player-${job}`, job, abilities: [], mistakeColumnsEnabled: false }]);
+      }
+      setSelectedJobs((prev) => [...prev, job]);
+    }
+  }
 
   function cycleDamageType(bossAbility: string) {
     setLocalTimeline((prev) =>
@@ -959,12 +1011,12 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           row.timestamp,
           row.damageEvent,
           allJobs,
-          abilitiesByJob,
+          filteredAbilitiesByJob,
           playerByJob,
           assignmentsByPlayerAbility
         )
       ),
-    [visibleRows, allJobs, abilitiesByJob, playerByJob, assignmentsByPlayerAbility]
+    [visibleRows, allJobs, filteredAbilitiesByJob, playerByJob, assignmentsByPlayerAbility]
   );
 
   const totalColCount = useMemo(() => {
@@ -1101,7 +1153,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               )}
               {readOnly && viewLinkId && (
                 <CompareDialog
-                  originalPlayers={players}
+                  originalPlayers={localPlayers}
                   originalTimeline={timeline}
                   originalTitle={title ?? ""}
                   abilitiesByJob={abilitiesByJob}
@@ -1189,110 +1241,143 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           </div>
         )}
 
-        {/* Player controls — only in My view (read-only) */}
+        {/* Job multiselect — view mode, My plan view */}
         {readOnly && timelineViewMode === "my" && (
-          <div className="flex items-center gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 px-3 py-2 bg-zinc-50 dark:bg-slate-900">
-            <div className="relative flex-1 min-w-0">
-              <span
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-1 h-4 rounded-sm z-10 pointer-events-none"
-                style={{ backgroundColor: myRoleColor }}
-              />
-              <select
-                value={myTimelinePlayerJob ?? ""}
-                onChange={(e) => {
-                  if (e.target.value) setMyTimelinePlayerJob(e.target.value as JobAbbreviation);
-                }}
-                className="w-full h-8 pl-5 pr-2 rounded-md border border-zinc-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-zinc-700 dark:text-slate-200 appearance-none focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer"
-              >
-                <option value="">Pick your job…</option>
-                {allJobs.map((job) => {
-                  const p = playerByJob.get(job);
-                  return p ? <option key={p.id} value={job}>{job}</option> : null;
-                })}
-              </select>
-              <ChevronDown
-                size={12}
-                className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400 dark:text-slate-500"
-              />
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 px-3 py-2 bg-zinc-50 dark:bg-slate-900">
+            <span className="text-xs font-medium text-zinc-500 dark:text-slate-400 shrink-0">
+              Showing
+            </span>
+            <span className={cn(
+              "inline-flex items-center h-5 px-1.5 rounded-full border text-[10.5px] font-semibold font-mono shrink-0",
+              myPlanViewJobs.length === allJobs.length
+                ? "bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400"
+                : "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-500 dark:text-slate-400"
+            )}>
+              {myPlanViewJobs.length}/{allJobs.length}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {allJobs.map((job) => {
+                const active = myPlanViewJobs.includes(job);
+                const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                return (
+                  <button
+                    key={job}
+                    onClick={() => setMyPlanViewJobs((prev) =>
+                      active ? prev.filter((j) => j !== job) : [...prev, job]
+                    )}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border transition-colors",
+                      active
+                        ? "bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500"
+                        : "bg-white dark:bg-slate-900 border-zinc-200 dark:border-slate-700 text-zinc-400 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-slate-600"
+                    )}
+                  >
+                    <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: active ? roleColor : "#94a3b8" }} />
+                    {job}
+                  </button>
+                );
+              })}
             </div>
-            <button
-              onClick={handlePlayPause}
-              title={isRunning ? "Pause timer" : "Play timer"}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 dark:border-slate-700 text-zinc-600 dark:text-slate-300 hover:bg-zinc-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-              aria-label={isRunning ? "Pause timer" : "Play timer"}
-            >
-              {isRunning ? <Pause size={14} /> : <Play size={14} />}
-            </button>
-            <button
-              onClick={handleReset}
-              title="Reset timer"
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 dark:border-slate-700 text-zinc-600 dark:text-slate-300 hover:bg-zinc-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-              aria-label="Reset timer"
-            >
-              <RotateCcw size={14} />
-            </button>
+            {myPlanViewJobs.length < allJobs.length && (
+              <button
+                onClick={() => setMyPlanViewJobs(allJobs)}
+                className="text-xs text-teal-600 dark:text-teal-400 hover:underline shrink-0"
+              >
+                All
+              </button>
+            )}
           </div>
         )}
 
-        {/* Next Up — only in My view (read-only) when there's an assignment */}
-        {readOnly && timelineViewMode === "my" && myNextRow && (
-          <div className="relative flex flex-col gap-1.5 px-4 py-2.5 rounded-lg border border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/40 overflow-hidden">
-            <div
-              className="absolute bottom-0 left-0 h-0.5 bg-teal-400/50 dark:bg-teal-400/30"
-              style={{
-                width: `${(() => {
-                  if (!isRunning && elapsedMs === 0) return 0;
-                  const start = myCurrentRow?.timestamp ?? 0;
-                  const end = myNextRow.timestamp;
-                  if (end <= start) return 100;
-                  return Math.min(100, Math.max(0, ((elapsedMs - start) / (end - start)) * 100));
-                })()}%`,
-              }}
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold font-mono tracking-wider text-teal-600 dark:text-teal-400 shrink-0">
-                NEXT UP
-              </span>
-              <span className={cn(
-                "font-mono text-sm font-bold shrink-0 tabular-nums",
-                !isRunning && elapsedMs > 0
-                  ? "text-teal-500 dark:text-teal-400 animate-pulse"
-                  : "text-teal-700 dark:text-teal-300"
-              )}>
-                {(isRunning || elapsedMs > 0) ? formatTimestamp(myNextRow.timestamp - elapsedMs) : "——:——"}
-              </span>
-            </div>
-            <span className="text-base font-semibold text-zinc-800 dark:text-slate-100">
-              {myNextRow.bossAbility}
-            </span>
-            {myNextRowAbilities.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {myNextRowAbilities.map((ability) =>
-                  myPlanCompactView ? (
-                    <Image key={ability.id} src={ability.iconPath} alt={ability.name} width={32} height={32} className="rounded" title={ability.name} />
-                  ) : (
-                    <span key={ability.id} className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium bg-white dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300">
-                      <Image src={ability.iconPath} alt={ability.name} width={32} height={32} className="rounded-sm shrink-0" />
-                      {ability.name}
-                    </span>
-                  )
-                )}
-              </div>
+        {/* Next Up + timer — always visible in My view (read-only) */}
+        {readOnly && timelineViewMode === "my" && (
+          <div className="relative flex gap-3 px-4 py-2.5 rounded-lg border border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/40 overflow-hidden">
+            {myNextRow && (
+              <div
+                className="absolute bottom-0 left-0 h-0.5 bg-teal-400/50 dark:bg-teal-400/30"
+                style={{
+                  width: `${(() => {
+                    if (!isRunning && elapsedMs === 0) return 0;
+                    const start = myCurrentRow?.timestamp ?? 0;
+                    const end = myNextRow.timestamp;
+                    if (end <= start) return 100;
+                    return Math.min(100, Math.max(0, ((elapsedMs - start) / (end - start)) * 100));
+                  })()}%`,
+                }}
+              />
             )}
-            {myNextRowFollowups.length > 0 && (
-              <div className="flex flex-col gap-1 pt-1.5 border-t border-teal-200/60 dark:border-teal-800/40">
-                {myNextRowFollowups.map(({ row, abilities }) => (
-                  <div key={row.timestamp} className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-mono font-semibold text-teal-500 dark:text-teal-400 shrink-0">
-                      +{formatTimestamp(row.timestamp - myNextRow.timestamp)}
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+              {myNextRow ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold font-mono tracking-wider text-teal-600 dark:text-teal-400 shrink-0">
+                      NEXT UP
                     </span>
-                    {abilities.map((ability) => (
-                      <Image key={ability.id} src={ability.iconPath} alt={ability.name} width={24} height={24} className="rounded opacity-80" title={ability.name} />
-                    ))}
+                    <span className={cn(
+                      "font-mono text-sm font-bold shrink-0 tabular-nums",
+                      !isRunning && elapsedMs > 0
+                        ? "text-teal-500 dark:text-teal-400 animate-pulse"
+                        : "text-teal-700 dark:text-teal-300"
+                    )}>
+                      {(isRunning || elapsedMs > 0) ? formatTimestamp(myNextRow.timestamp - elapsedMs) : "——:——"}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <span className="text-base font-semibold text-zinc-800 dark:text-slate-100">
+                    {myNextRow.bossAbility}
+                  </span>
+                  {myNextRowAbilities.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {myNextRowAbilities.map((ability) =>
+                        myPlanCompactView ? (
+                          <Image key={ability.id} src={ability.iconPath} alt={ability.name} width={32} height={32} className="rounded" title={ability.name} />
+                        ) : (
+                          <span key={ability.id} className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs font-medium bg-white dark:bg-teal-900/30 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300">
+                            <Image src={ability.iconPath} alt={ability.name} width={32} height={32} className="rounded-sm shrink-0" />
+                            {ability.name}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  )}
+                  {myNextRowFollowups.length > 0 && (
+                    <div className="flex flex-col gap-1 pt-1.5 border-t border-teal-200/60 dark:border-teal-800/40">
+                      {myNextRowFollowups.map(({ row, abilities }) => (
+                        <div key={row.timestamp} className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-semibold text-teal-500 dark:text-teal-400 shrink-0">
+                            +{formatTimestamp(row.timestamp - myNextRow.timestamp)}
+                          </span>
+                          {abilities.map((ability) => (
+                            <Image key={ability.id} src={ability.iconPath} alt={ability.name} width={24} height={24} className="rounded opacity-80" title={ability.name} />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span className="text-xs text-teal-600/70 dark:text-teal-400/60 self-center py-1">
+                  {myPlanViewJobs.length === 0 ? "Select a job above" : "No upcoming assignments"}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col items-center gap-1.5 shrink-0 self-center">
+              <button
+                onClick={handlePlayPause}
+                title={isRunning ? "Pause timer" : "Play timer"}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 dark:border-teal-700 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors"
+                aria-label={isRunning ? "Pause timer" : "Play timer"}
+              >
+                {isRunning ? <Pause size={13} /> : <Play size={13} />}
+              </button>
+              <button
+                onClick={handleReset}
+                title="Reset timer"
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 dark:border-teal-700 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors"
+                aria-label="Reset timer"
+              >
+                <RotateCcw size={13} />
+              </button>
+            </div>
           </div>
         )}
 
@@ -1437,7 +1522,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                     key={`${item.row.timestamp}-${item.row.bossAbility}-${item.rowIndex}`}
                     row={item.row}
                     index={item.rowIndex}
-                    players={players}
+                    players={localPlayers}
                     selectedJobs={selectedJobs}
                     abilitiesByJob={filteredAbilitiesByJob}
                     cellStates={rowCellStates[item.rowIndex]}
@@ -1465,12 +1550,12 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
         )}
         {timelineViewMode === "my" && (
           <MyTimeline
-            players={players}
+            players={localPlayers}
             timeline={localTimeline}
             phases={localPhases}
             assignments={assignments}
             abilitiesByJob={abilitiesByJob}
-            selectedJobs={readOnly ? (myTimelinePlayerJob ? [myTimelinePlayerJob] : []) : myPlanEditJobs}
+            selectedJobs={readOnly ? myPlanViewJobs : myPlanEditJobs}
             currentTimestamp={readOnly ? (myNextRow?.timestamp ?? null) : null}
             onTogglePhase={stableTogglePhase}
           />

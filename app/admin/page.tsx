@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,9 +8,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { JOB_GROUPS, JOB_NAMES, ALL_JOBS } from "@/lib/jobs";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { XivApiAction, JobAbilityRecord } from "@/types/job-ability";
+import EncounterAdmin from "./EncounterAdmin";
 
 type AbilityTarget = "self" | "party" | "single";
-type AbilityType = "mitigation" | "utility" | "buff" | "interrupt";
+type AbilityType = "mitigation" | "utility" | "buff" | "interrupt" | "cleanse";
 
 interface SavedAbility {
   xivapiId: number;
@@ -76,12 +77,27 @@ const inputCls =
 const selectCls =
   "px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-400";
 
+const VALID_TABS = ["abilities", "encounters"] as const;
+type AdminTab = (typeof VALID_TABS)[number];
+
 export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState<AdminTab>("abilities");
   const [selectedJob, setSelectedJob] = useState<JobAbbreviation>("PLD");
   const [rows, setRows] = useState<EditRow[]>([]);
   const [status, setStatus] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const hash = window.location.hash.slice(1) as AdminTab;
+    if (VALID_TABS.includes(hash)) setActiveTab(hash);
+  }, []);
+
+  const handleTabChange = (value: string) => {
+    const tab = value as AdminTab;
+    setActiveTab(tab);
+    window.location.hash = tab;
+  };
 
   const handleLoad = async () => {
     setIsLoading(true);
@@ -154,11 +170,23 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="p-8 max-w-[1400px] mx-auto">
-      <h1 className="text-2xl font-bold mb-1">Ability Admin</h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-        Fetch job abilities from XIVAPI, fill in mitigation values, and save to database.
-      </p>
+    <main className="p-8 max-w-[1400px] min-w-[900px] mx-auto">
+      <h1 className="text-2xl font-bold mb-1">Admin</h1>
+
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
+        <TabsList className="mb-8">
+          <TabsTrigger value="abilities">Abilities</TabsTrigger>
+          <TabsTrigger value="encounters">Encounters</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="encounters">
+          <EncounterAdmin />
+        </TabsContent>
+
+        <TabsContent value="abilities">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
+            Fetch job abilities from XIVAPI, fill in mitigation values, and save to database.
+          </p>
 
       <Tabs
         defaultValue="Tank"
@@ -344,6 +372,7 @@ export default function AdminPage() {
                       <option value="utility">Utility</option>
                       <option value="buff">Buff</option>
                       <option value="interrupt">Interrupt</option>
+                      <option value="cleanse">Cleanse</option>
                     </select>
                   </td>
                 </tr>
@@ -352,6 +381,8 @@ export default function AdminPage() {
           </table>
         </div>
       )}
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

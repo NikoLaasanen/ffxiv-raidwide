@@ -22,6 +22,7 @@ export default function NewPlanPage() {
   const [currentPhases, setCurrentPhases] = useState<PhaseDivider[]>([]);
   const handlePhasesChange = useCallback((p: PhaseDivider[]) => setCurrentPhases(p), []);
   const hasSaved = useRef(false);
+  const phasesInitialized = useRef(false);
 
   useEffect(() => {
     if (hasHydrated && pendingImport === null && !hasSaved.current) {
@@ -29,9 +30,16 @@ export default function NewPlanPage() {
     }
   }, [hasHydrated, pendingImport, router]);
 
+  useEffect(() => {
+    if (pendingImport && !phasesInitialized.current) {
+      phasesInitialized.current = true;
+      setCurrentPhases(pendingImport.phases ?? []);
+    }
+  }, [pendingImport]);
+
   if (!hasHydrated || !pendingImport) return null;
 
-  const { reportCode, fight, players, timeline } = pendingImport;
+  const { reportCode, fight, players, timeline, encounterId } = pendingImport;
   const visibleRows = timeline.filter((row) => !row.hidden);
   const duration = formatTimestamp(fight.endTime - fight.startTime);
   const fflogsUrl = `https://www.fflogs.com/reports/${reportCode}#fight=${fight.id}`;
@@ -47,7 +55,7 @@ export default function NewPlanPage() {
         editLinkId,
         viewLinkId,
         title: fight.name,
-        encounterId: null,
+        encounterId: encounterId ?? null,
         raidplanLink: fflogsUrl,
         timeline,
         players,
@@ -86,7 +94,7 @@ export default function NewPlanPage() {
         </p>
       </div>
 
-      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} onAssignmentsChange={handleAssignmentsChange} onPhasesChange={handlePhasesChange} />
+      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} phases={currentPhases} onAssignmentsChange={handleAssignmentsChange} onPhasesChange={handlePhasesChange} />
 
       <div className="mt-6 flex items-center gap-3">
         <Button onClick={handleSave} disabled={saving}>

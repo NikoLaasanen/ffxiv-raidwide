@@ -84,7 +84,6 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
         showSourceColumn: state.showSourceColumn,
         showMechanicTypeColumn: state.showMechanicTypeColumn,
         showMistakesColumn: state.showMistakesColumn,
-        timelineViewMode: state.timelineViewMode,
         myTimelinePlayerJob: state.myTimelinePlayerJob,
         myPlanDefaultJob: state.myPlanDefaultJob,
         myPlanCompactView: state.myPlanCompactView,

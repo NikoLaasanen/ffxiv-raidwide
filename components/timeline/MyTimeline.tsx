@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { JOB_ROLE_COLOR, ALL_JOBS } from "@/lib/jobs";
 import Image from "next/image";
 import { usePreferencesStore } from "@/store/preferences-store";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const MECHANIC_BADGE: Partial<Record<MechanicType, { label: string; className: string }>> = {
   enrage:     { label: "Enrage",     className: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" },
@@ -97,6 +98,20 @@ export function MyTimeline({
   const abilityById = useMemo(
     () => new Map(playerAbilities.map((a) => [a.id, a])),
     [playerAbilities]
+  );
+
+  const hasCleanseCapability = useMemo(
+    () => sortedSelectedJobs.some((job) =>
+      (abilitiesByJob[job] ?? []).some((ab) => ab.abilityType === "cleanse")
+    ),
+    [sortedSelectedJobs, abilitiesByJob]
+  );
+
+  const hasInterruptCapability = useMemo(
+    () => sortedSelectedJobs.some((job) =>
+      (abilitiesByJob[job] ?? []).some((ab) => ab.abilityType === "interrupt")
+    ),
+    [sortedSelectedJobs, abilitiesByJob]
   );
 
   // Track which job each assignment belongs to for display
@@ -306,6 +321,26 @@ export function MyTimeline({
                         <span className="text-sm font-semibold text-zinc-800 dark:text-slate-100 leading-tight">
                           {row.bossAbility}
                         </span>
+                        {row.cleanse && hasCleanseCapability && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 cursor-default">
+                                Cleanse
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">Players should cleanse this debuff</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {row.interrupt && hasInterruptCapability && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 cursor-default">
+                                Interrupt
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">This ability can be interrupted</TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -331,6 +366,26 @@ export function MyTimeline({
                               height={16}
                               className="shrink-0 opacity-70"
                             />
+                          )}
+                          {row.cleanse && hasCleanseCapability && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 cursor-default">
+                                  Cleanse
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">Players should cleanse this debuff</TooltipContent>
+                            </Tooltip>
+                          )}
+                          {row.interrupt && hasInterruptCapability && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 cursor-default">
+                                  Interrupt
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">This ability can be interrupted</TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1.5 mt-2">

@@ -1,4 +1,4 @@
-import type { Player } from "@/types/player";
+import type { Player, PhaseDivider } from "@/types/player";
 import type { TimelineRow } from "@/types/timeline";
 
 export interface FFLogsTokenResponse {
@@ -80,4 +80,6 @@ export interface FflogsImportResult {
   players: Player[];
   timeline: TimelineRow[];
   casts: PlayerCastEvent[];
+  encounterId: string | null;
+  phases: PhaseDivider[];
 }
