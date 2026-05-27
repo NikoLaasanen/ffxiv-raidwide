@@ -9,6 +9,7 @@ export interface EncounterDoc {
   type: EncounterType;
   tier: string;
   patch: string;
+  imageName?: string;
   timeline: TimelineRow[];
   phases: PhaseDivider[];
   createdAt: number;

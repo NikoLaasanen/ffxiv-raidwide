@@ -167,12 +167,21 @@ function EncounterEditor({
   const [type, setType] = useState<EncounterType>(initial?.type ?? "Savage");
   const [tier, setTier] = useState(initial?.tier ?? "");
   const [patch, setPatch] = useState(initial?.patch ?? "");
+  const [imageName, setImageName] = useState(initial?.imageName ?? "");
+  const [availableImages, setAvailableImages] = useState<string[]>([]);
   const [rows, setRows] = useState<EditorRow[]>(toEditorRows(initial?.timeline ?? []));
   const [phases, setPhases] = useState<EditorPhase[]>(toEditorPhases(initial?.phases ?? []));
   const [fflogsUrl, setFflogsUrl] = useState("");
   const [importStatus, setImportStatus] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/encounters/images")
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
+      .then((data) => setAvailableImages(data.images ?? []))
+      .catch(() => {});
+  }, []);
 
   const handleImport = async () => {
     const parsed = parseFflogsUrl(fflogsUrl);
@@ -264,6 +273,7 @@ function EncounterEditor({
         type,
         tier: tier.trim(),
         patch: patch.trim(),
+        imageName,
         timeline: editorRowsToTimeline(rows),
         phases: editorPhasesToPhases(phases),
         createdAt: initial?.createdAt ?? Date.now(),
@@ -278,7 +288,7 @@ function EncounterEditor({
   return (
     <div className="space-y-8">
       {/* Metadata */}
-      <div className="grid grid-cols-4 gap-4 max-w-3xl">
+      <div className="grid grid-cols-5 gap-4 max-w-4xl">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-zinc-500">Name</label>
           <input className={inputCls + " w-full"} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. M4S" />
@@ -299,6 +309,15 @@ function EncounterEditor({
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-zinc-500">Patch</label>
           <input className={inputCls + " w-full"} value={patch} onChange={(e) => setPatch(e.target.value)} placeholder="e.g. 7.1" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-zinc-500">Cover Image</label>
+          <select className={selectCls + " w-full"} value={imageName} onChange={(e) => setImageName(e.target.value)}>
+            <option value="">No image</option>
+            {availableImages.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
         </div>
       </div>
 

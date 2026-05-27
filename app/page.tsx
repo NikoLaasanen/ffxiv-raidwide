@@ -48,11 +48,13 @@ function shortCode(name: string): string {
 function EncounterCoverArt({
   type,
   uid,
+  imageName,
   className = "",
   children,
 }: {
   type: EncounterType | null | undefined;
   uid: string;
+  imageName?: string;
   className?: string;
   children?: React.ReactNode;
 }) {
@@ -126,7 +128,15 @@ function EncounterCoverArt({
       className={`relative overflow-hidden ${className}`}
       style={{ background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)` }}
     >
-      <svg
+      {imageName && (
+        <img
+          src={`/encounters/${imageName}`}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          aria-hidden
+        />
+      )}
+      {!imageName && <svg
         width="100%"
         height="100%"
         viewBox="0 0 100 100"
@@ -150,7 +160,7 @@ function EncounterCoverArt({
         </defs>
         <rect width="100" height="100" fill={`url(#${patId})`} />
         {glyph[type ?? "Other"] ?? glyph["Other"]}
-      </svg>
+      </svg>}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50 pointer-events-none" />
       {children}
     </div>
@@ -429,6 +439,7 @@ function EncounterTile({
       <EncounterCoverArt
         type={enc.type}
         uid={enc.id}
+        imageName={enc.imageName}
         className="absolute inset-0 w-full h-full"
       >
         {/* Top badges */}

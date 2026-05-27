@@ -10,6 +10,7 @@ interface EncounterPayload {
   type?: string;
   tier: string;
   patch: string;
+  imageName?: string;
   timeline: TimelineRow[];
   phases: PhaseDivider[];
 }
@@ -27,7 +28,7 @@ export async function GET(): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   try {
     const body = (await request.json()) as EncounterPayload;
-    const { id, name, type, tier, patch, timeline, phases } = body;
+    const { id, name, type, tier, patch, imageName, timeline, phases } = body;
 
     if (!name?.trim()) return Response.json({ error: "name is required" }, { status: 400 });
 
@@ -42,6 +43,7 @@ export async function POST(request: Request): Promise<Response> {
       type: type ?? "",
       tier: tier?.trim() ?? "",
       patch: patch?.trim() ?? "",
+      imageName: imageName ?? "",
       timeline: timeline ?? [],
       phases: phases ?? [],
       createdAt: existing.exists ? existing.data()!.createdAt : now,

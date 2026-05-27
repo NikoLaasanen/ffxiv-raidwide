@@ -56,6 +56,8 @@ export const SKIPPED_ABILITIES = new Set([
   "Sustained Damage",
   "Explosion",
   "Unmitigated Explosion",
+  "Bleeding",
+  "Deep Freeze",
 ]);
 
 export const TANK_JOBS = new Set<JobAbbreviation>(["PLD", "WAR", "DRK", "GNB"]);
