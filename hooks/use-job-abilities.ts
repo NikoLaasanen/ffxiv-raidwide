@@ -6,12 +6,17 @@ import { getJobAbilities } from "@/lib/job-ability-service";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 
-export function useJobAbilities(jobs: JobAbbreviation[]) {
+export function useJobAbilities(
+  jobs: JobAbbreviation[],
+  { includeDisabled = false }: { includeDisabled?: boolean } = {}
+) {
   const results = useQueries({
     queries: jobs.map((job) => ({
-      queryKey: ["job-abilities", job],
+      queryKey: ["job-abilities", job, includeDisabled],
       queryFn: () =>
-        getJobAbilities(job).then((list) => list.filter((a) => a.enabled)),
+        getJobAbilities(job).then((list) =>
+          includeDisabled ? list : list.filter((a) => a.enabled)
+        ),
       staleTime: 10 * 60 * 1000,
     })),
   });
