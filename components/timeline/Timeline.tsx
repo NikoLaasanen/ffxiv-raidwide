@@ -1117,7 +1117,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                 </button>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-1.5 md:flex md:items-center md:gap-2">
+            <div className="flex items-center gap-1.5 md:gap-2">
               {raidplanLink && (
                 <Button variant="outline" size="icon-sm" asChild aria-label="View on FFLogs">
                   <a href={raidplanLink} target="_blank" rel="noopener noreferrer">

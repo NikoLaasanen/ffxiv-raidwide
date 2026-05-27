@@ -1,5 +1,6 @@
 import type { Player, PhaseDivider } from "@/types/player";
 import type { TimelineRow } from "@/types/timeline";
+import type { EncounterType } from "@/types/encounter";
 
 export interface FFLogsTokenResponse {
   access_token: string;
@@ -81,5 +82,7 @@ export interface FflogsImportResult {
   timeline: TimelineRow[];
   casts: PlayerCastEvent[];
   encounterId: string | null;
+  encounterType: EncounterType | null;
+  encounterTier: string | null;
   phases: PhaseDivider[];
 }

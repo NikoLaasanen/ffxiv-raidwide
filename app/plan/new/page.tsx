@@ -4,12 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
 import { Button } from "@/components/ui/button";
+import { ExternalLink } from "lucide-react";
 import { Timeline } from "@/components/timeline/Timeline";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { savePlan } from "@/lib/plan-service";
 import { getVisibleRows } from "@/lib/timeline-utils";
 import type { MitigationAssignment } from "@/types/timeline";
 import type { PhaseDivider } from "@/types/player";
+
+const TYPE_BADGE: Record<string, string> = {
+  Ultimate: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  Savage: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+  Criterion: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+};
 
 export default function NewPlanPage() {
   const router = useRouter();
@@ -40,7 +47,7 @@ export default function NewPlanPage() {
 
   if (!hasHydrated || !pendingImport) return null;
 
-  const { reportCode, fight, players, timeline, encounterId } = pendingImport;
+  const { reportCode, fight, players, timeline, encounterId, encounterType, encounterTier } = pendingImport;
   const visibleRows = getVisibleRows(timeline);
   const duration = formatTimestamp(fight.endTime - fight.startTime);
   const fflogsUrl = `https://www.fflogs.com/reports/${reportCode}#fight=${fight.id}`;
@@ -57,6 +64,8 @@ export default function NewPlanPage() {
         viewLinkId,
         title: fight.name,
         encounterId: encounterId ?? null,
+        encounterType: encounterType ?? null,
+        encounterTier: encounterTier ?? null,
         raidplanLink: fflogsUrl,
         timeline,
         players,
@@ -78,24 +87,39 @@ export default function NewPlanPage() {
 
   return (
     <main className="p-8">
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{fight.name}</h1>
-          <a
-            href={fflogsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors"
-          >
-            View on FFLogs ↗
-          </a>
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            {encounterType && (
+              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${TYPE_BADGE[encounterType] ?? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"}`}>
+                {encounterType}
+              </span>
+            )}
+            {encounterTier && <span>{encounterTier}</span>}
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <a href={fflogsUrl} target="_blank" rel="noopener noreferrer" aria-label="View on FFLogs" className="gap-1.5">
+              <ExternalLink size={16} />
+              <span className="hidden md:inline">View on FFLogs</span>
+            </a>
+          </Button>
         </div>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {players.length} players · {visibleRows.length} timeline events · {duration}
-        </p>
+        <h1 className="text-2xl font-bold">{fight.name}</h1>
       </div>
 
-      <Timeline timeline={timeline} players={players} casts={pendingImport.casts} phases={currentPhases} onAssignmentsChange={handleAssignmentsChange} onPhasesChange={handlePhasesChange} />
+      <Timeline
+        timeline={timeline}
+        players={players}
+        casts={pendingImport.casts}
+        phases={currentPhases}
+        onAssignmentsChange={handleAssignmentsChange}
+        onPhasesChange={handlePhasesChange}
+        headerLeft={
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            {players.length} players · {visibleRows.length} timeline events · {duration}
+          </p>
+        }
+      />
 
       <div className="mt-6 flex items-center gap-3">
         <Button onClick={handleSave} disabled={saving}>

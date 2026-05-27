@@ -312,6 +312,8 @@ export async function POST(request: Request): Promise<Response> {
       }));
 
     let encounterId: string | null = null;
+    let encounterType: string | null = null;
+    let encounterTier: string | null = null;
     let phases: PhaseDivider[] = [];
 
     const fightNameLower = fight.name.toLowerCase();
@@ -323,6 +325,8 @@ export async function POST(request: Request): Promise<Response> {
     if (matchedDoc) {
       const enc = matchedDoc.data();
       encounterId = matchedDoc.id;
+      encounterType = (enc.type as string) ?? null;
+      encounterTier = (enc.tier as string) ?? null;
       phases = (enc.phases ?? []) as PhaseDivider[];
 
       const encounterRows = (enc.timeline ?? []) as TimelineRow[];
@@ -350,7 +354,7 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    return Response.json({ reportCode, fight, players, timeline, casts, encounterId, phases });
+    return Response.json({ reportCode, fight, players, timeline, casts, encounterId, encounterType, encounterTier, phases });
   } catch (err) {
     return apiError(err);
   }

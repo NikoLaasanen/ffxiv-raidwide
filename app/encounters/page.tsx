@@ -43,6 +43,8 @@ export default function EncountersPage() {
       viewLinkId,
       title: encounter.name,
       encounterId: encounter.id,
+      encounterType: encounter.type ?? null,
+      encounterTier: encounter.tier ?? null,
       raidplanLink: null,
       timeline: encounter.timeline,
       players: [],
