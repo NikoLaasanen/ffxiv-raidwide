@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useEffect, useState } from "react";
+import { useMemo, useRef, useEffect, useState, Fragment } from "react";
 import type { TimelineRow, MitigationAssignment, MechanicType } from "@/types/timeline";
 import type { DamageType } from "@/types/common";
 import type { Player, PhaseDivider } from "@/types/player";
@@ -53,6 +53,7 @@ export function MyTimeline({
   onTogglePhase,
 }: MyTimelineProps) {
   const myPlanCompactView = usePreferencesStore((s) => s.myPlanCompactView);
+  const myPlanCompactStyle = usePreferencesStore((s) => s.myPlanCompactStyle);
   const [toolboxOpen, setToolboxOpen] = useState(false);
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -232,69 +233,68 @@ export function MyTimeline({
         <>
           {/* Scrollable timeline list */}
           <div className="flex-1 overflow-y-auto">
-            {displayItems.map((item, idx) => {
-              if (item.kind === "phase") {
-                return (
-                  <button
-                    key={`phase-${item.phase.timestamp}`}
-                    onClick={() => onTogglePhase?.(item.phase.timestamp)}
-                    className="flex w-full items-center gap-2 px-4 py-2 bg-zinc-100/80 dark:bg-slate-800/60 border-b border-zinc-200 dark:border-slate-700 text-left hover:bg-zinc-200/60 dark:hover:bg-slate-700/60 transition-colors"
-                  >
-                    {item.phase.collapsed
-                      ? <ChevronRight size={13} className="text-teal-500 dark:text-teal-400 shrink-0" />
-                      : <ChevronDown size={13} className="text-teal-500 dark:text-teal-400 shrink-0" />
-                    }
-                    <span className="text-xs font-semibold text-zinc-700 dark:text-slate-300">
-                      {item.phase.name}
-                    </span>
-                    <span className="text-xs font-mono text-zinc-400 dark:text-slate-500 ml-1">
-                      {formatTimestamp(item.phase.timestamp)}–{formatTimestamp(item.endTimestamp)}
-                    </span>
-                  </button>
-                );
-              }
+            <div className={myPlanCompactStyle === "centered" ? "grid grid-cols-[1fr_auto_1fr]" : undefined}>
+              {displayItems.map((item, idx) => {
+                if (item.kind === "phase") {
+                  return (
+                    <button
+                      key={`phase-${item.phase.timestamp}`}
+                      onClick={() => onTogglePhase?.(item.phase.timestamp)}
+                      className={cn(
+                        "flex w-full items-center gap-2 px-4 py-2 bg-zinc-100/80 dark:bg-slate-800/60 border-b border-zinc-200 dark:border-slate-700 text-left hover:bg-zinc-200/60 dark:hover:bg-slate-700/60 transition-colors",
+                        myPlanCompactStyle === "centered" && "col-span-3"
+                      )}
+                    >
+                      {item.phase.collapsed
+                        ? <ChevronRight size={13} className="text-teal-500 dark:text-teal-400 shrink-0" />
+                        : <ChevronDown size={13} className="text-teal-500 dark:text-teal-400 shrink-0" />
+                      }
+                      <span className="text-xs font-semibold text-zinc-700 dark:text-slate-300">
+                        {item.phase.name}
+                      </span>
+                      <span className="text-xs font-mono text-zinc-400 dark:text-slate-500 ml-1">
+                        {formatTimestamp(item.phase.timestamp)}–{formatTimestamp(item.endTimestamp)}
+                      </span>
+                    </button>
+                  );
+                }
 
-              const { row, abilityEntries } = item;
-              const dmg = row.damageEvent?.rawDamage ?? 0;
-              const sev = dmg >= highThreshold ? "high" : dmg >= medThreshold ? "med" : dmg > 0 ? "low" : null;
-              const stripeClass =
-                sev === "high"
-                  ? "border-l-red-500"
-                  : sev === "med"
-                  ? "border-l-amber-400"
-                  : "border-l-zinc-200 dark:border-l-slate-700";
-              const mechBadge =
-                row.mechanicType && row.mechanicType !== "unknown"
-                  ? MECHANIC_BADGE[row.mechanicType]
+                const { row, abilityEntries } = item;
+                const dmg = row.damageEvent?.rawDamage ?? 0;
+                const sev = dmg >= highThreshold ? "high" : dmg >= medThreshold ? "med" : dmg > 0 ? "low" : null;
+                const stripeClass =
+                  sev === "high"
+                    ? "border-l-red-500"
+                    : sev === "med"
+                    ? "border-l-amber-400"
+                    : "border-l-zinc-200 dark:border-l-slate-700";
+                const mechBadge =
+                  row.mechanicType && row.mechanicType !== "unknown"
+                    ? MECHANIC_BADGE[row.mechanicType]
+                    : null;
+                const dmgTypeIcon = row.damageEvent?.type
+                  ? DAMAGE_TYPE_ICON[row.damageEvent.type]
                   : null;
-              const dmgTypeIcon = row.damageEvent?.type
-                ? DAMAGE_TYPE_ICON[row.damageEvent.type]
-                : null;
 
-              return (
-                <div
-                  key={`row-${row.timestamp}-${idx}`}
-                  ref={(el) => {
-                    if (el) rowRefs.current.set(row.timestamp, el);
-                    else rowRefs.current.delete(row.timestamp);
-                  }}
-                  className={cn(
-                    `flex items-stretch gap-3 pl-3 pr-4 border-b border-zinc-100 dark:border-slate-800/60 last:border-b-0 border-l-[3px] ${myPlanCompactView ? "py-1.5" : "py-3"}`,
-                    stripeClass,
-                    row.timestamp === currentTimestamp && "bg-teal-50 dark:bg-teal-950/40 ring-1 ring-inset ring-teal-300 dark:ring-teal-700"
-                  )}
-                >
-                  {/* Timestamp */}
-                  <div className="min-w-[3rem] shrink-0 flex items-start pt-0.5">
-                    <span className="font-mono text-sm font-bold text-zinc-700 dark:text-slate-200 leading-tight">
-                      {formatTimestamp(row.timestamp)}
-                    </span>
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    {myPlanCompactView ? (
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                if (myPlanCompactStyle === "classic") {
+                  const isCurrentRow = row.timestamp === currentTimestamp;
+                  if (myPlanCompactView) {
+                    return (
+                      <div
+                        key={`row-${row.timestamp}-${idx}`}
+                        ref={(el) => {
+                          if (el) rowRefs.current.set(row.timestamp, el);
+                          else rowRefs.current.delete(row.timestamp);
+                        }}
+                        className={cn(
+                          "flex items-center gap-1.5 flex-wrap py-1.5 pl-3 pr-4 border-b border-zinc-100 dark:border-slate-800/60 last:border-b-0 border-l-[3px]",
+                          stripeClass,
+                          isCurrentRow && "bg-teal-50 dark:bg-teal-950/40 ring-1 ring-inset ring-teal-300 dark:ring-teal-700"
+                        )}
+                      >
+                        <span className="font-mono text-sm font-bold text-zinc-700 dark:text-slate-200 leading-tight shrink-0">
+                          {formatTimestamp(row.timestamp)}
+                        </span>
                         {abilityEntries.map(({ job, abilityId }, i) => {
                           const ability = abilityById.get(abilityId);
                           if (!ability) return null;
@@ -342,37 +342,44 @@ export function MyTimeline({
                           </Tooltip>
                         )}
                       </div>
-                    ) : (
-                      <>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={`row-${row.timestamp}-${idx}`}
+                      ref={(el) => {
+                        if (el) rowRefs.current.set(row.timestamp, el);
+                        else rowRefs.current.delete(row.timestamp);
+                      }}
+                      className={cn(
+                        "flex items-stretch gap-3 pl-3 pr-4 border-b border-zinc-100 dark:border-slate-800/60 last:border-b-0 border-l-[3px] py-3",
+                        stripeClass,
+                        isCurrentRow && "bg-teal-50 dark:bg-teal-950/40 ring-1 ring-inset ring-teal-300 dark:ring-teal-700"
+                      )}
+                    >
+                      <div className="min-w-[3rem] shrink-0 flex items-start pt-0.5">
+                        <span className="font-mono text-sm font-bold text-zinc-700 dark:text-slate-200 leading-tight">
+                          {formatTimestamp(row.timestamp)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-sm font-semibold text-zinc-800 dark:text-slate-100 leading-tight">
                             {row.bossAbility}
                           </span>
                           {mechBadge && (
-                            <span
-                              className={cn(
-                                "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium",
-                                mechBadge.className
-                              )}
-                            >
+                            <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-medium", mechBadge.className)}>
                               {mechBadge.label}
                             </span>
                           )}
                           {dmgTypeIcon && (
-                            <Image
-                              src={dmgTypeIcon}
-                              alt={row.damageEvent!.type}
-                              width={16}
-                              height={16}
-                              className="shrink-0 opacity-70"
-                            />
+                            <Image src={dmgTypeIcon} alt={row.damageEvent!.type} width={16} height={16} className="shrink-0 opacity-70" />
                           )}
                           {row.cleanse && hasCleanseCapability && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 cursor-default">
-                                  Cleanse
-                                </span>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 cursor-default">Cleanse</span>
                               </TooltipTrigger>
                               <TooltipContent side="right">Players should cleanse this debuff</TooltipContent>
                             </Tooltip>
@@ -380,9 +387,7 @@ export function MyTimeline({
                           {row.interrupt && hasInterruptCapability && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 cursor-default">
-                                  Interrupt
-                                </span>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 cursor-default">Interrupt</span>
                               </TooltipTrigger>
                               <TooltipContent side="right">This ability can be interrupted</TooltipContent>
                             </Tooltip>
@@ -399,32 +404,124 @@ export function MyTimeline({
                                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300"
                               >
                                 {isMultiJob && (
+                                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: roleColor }} />
+                                )}
+                                <Image src={ability.iconPath} alt={ability.name} width={16} height={16} className="rounded-sm shrink-0" />
+                                {isMultiJob && <span className="text-[10px] font-semibold opacity-60">{job}</span>}
+                                {ability.name}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Centered style — grid Fragment for both compact and full
+                {
+                  const isCurrentRow = row.timestamp === currentTimestamp;
+                  const cellBase = cn(
+                    "border-b border-zinc-100 dark:border-slate-800/60",
+                    myPlanCompactView ? "py-1.5" : "py-3",
+                    isCurrentRow && "bg-teal-50 dark:bg-teal-950/40"
+                  );
+                  return (
+                    <Fragment key={`row-${row.timestamp}-${idx}`}>
+                      {/* Col 1: abilities right-aligned */}
+                      <div className={cn(cellBase, "flex items-center justify-end flex-wrap gap-1.5 pl-3 pr-2 border-l-[3px]", stripeClass)}>
+                        {myPlanCompactView ? (
+                          abilityEntries.map(({ job, abilityId }, i) => {
+                            const ability = abilityById.get(abilityId);
+                            if (!ability) return null;
+                            const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                            return (
+                              <span key={`${abilityId}-${i}`} className="relative inline-flex items-center shrink-0">
+                                {isMultiJob && (
                                   <span
-                                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                                    className="absolute -top-0.5 -left-0.5 w-2 h-2 rounded-full border border-white dark:border-slate-900 z-10"
                                     style={{ backgroundColor: roleColor }}
                                   />
                                 )}
                                 <Image
                                   src={ability.iconPath}
                                   alt={ability.name}
-                                  width={16}
-                                  height={16}
-                                  className="rounded-sm shrink-0"
+                                  width={24}
+                                  height={24}
+                                  className="rounded"
+                                  title={isMultiJob ? `${job}: ${ability.name}` : ability.name}
                                 />
+                              </span>
+                            );
+                          })
+                        ) : (
+                          abilityEntries.map(({ job, abilityId }, i) => {
+                            const ability = abilityById.get(abilityId);
+                            if (!ability) return null;
+                            const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                            return (
+                              <span
+                                key={`${abilityId}-${i}`}
+                                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-teal-800 dark:text-teal-300"
+                              >
                                 {isMultiJob && (
-                                  <span className="text-[10px] font-semibold opacity-60">{job}</span>
+                                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: roleColor }} />
                                 )}
+                                <Image src={ability.iconPath} alt={ability.name} width={16} height={16} className="rounded-sm shrink-0" />
+                                {isMultiJob && <span className="text-[10px] font-semibold opacity-60">{job}</span>}
                                 {ability.name}
                               </span>
                             );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                          })
+                        )}
+                      </div>
+                      {/* Col 2: Timestamp centered */}
+                      <div
+                        ref={(el) => {
+                          if (el) rowRefs.current.set(row.timestamp, el);
+                          else rowRefs.current.delete(row.timestamp);
+                        }}
+                        className={cn(cellBase, "flex items-center justify-center px-3")}
+                      >
+                        <span className="font-mono text-sm font-bold text-zinc-700 dark:text-slate-200 leading-tight">
+                          {formatTimestamp(row.timestamp)}
+                        </span>
+                      </div>
+                      {/* Col 3: Boss ability + badges */}
+                      <div className={cn(cellBase, "flex items-center gap-1.5 flex-wrap pl-2 pr-4")}>
+                        <span className="text-sm font-semibold text-zinc-500 dark:text-slate-400 leading-tight">
+                          {row.bossAbility}
+                        </span>
+                        {!myPlanCompactView && mechBadge && (
+                          <span className={cn("inline-block rounded px-1.5 py-0.5 text-[10px] font-medium", mechBadge.className)}>
+                            {mechBadge.label}
+                          </span>
+                        )}
+                        {!myPlanCompactView && dmgTypeIcon && (
+                          <Image src={dmgTypeIcon} alt={row.damageEvent!.type} width={16} height={16} className="shrink-0 opacity-70" />
+                        )}
+                        {row.cleanse && hasCleanseCapability && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 cursor-default">Cleanse</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">Players should cleanse this debuff</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {row.interrupt && hasInterruptCapability && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-[10px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 cursor-default">Interrupt</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">This ability can be interrupted</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </Fragment>
+                  );
+                }
+              })}
+            </div>
           </div>
 
           {/* Toolbox (collapsible) — single job only */}

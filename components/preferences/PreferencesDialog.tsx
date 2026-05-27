@@ -46,6 +46,7 @@ export function PreferencesDialog() {
     abilityTypeFilter, setAbilityTypeFilter,
     myPlanDefaultJob, setMyPlanDefaultJob,
     myPlanCompactView, setMyPlanCompactView,
+    myPlanCompactStyle, setMyPlanCompactStyle,
     resetPreferences,
   } = usePreferencesStore();
 
@@ -202,6 +203,18 @@ export function PreferencesDialog() {
               <span className="text-sm">Compact view</span>
               <Switch checked={myPlanCompactView} onCheckedChange={setMyPlanCompactView} />
             </label>
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="compact-style" className="text-sm">Layout style</label>
+              <select
+                id="compact-style"
+                value={myPlanCompactStyle}
+                onChange={(e) => setMyPlanCompactStyle(e.target.value as "centered" | "classic")}
+                className="h-8 rounded-md border border-zinc-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-zinc-700 dark:text-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              >
+                <option value="centered">Centered</option>
+                <option value="classic">Classic</option>
+              </select>
+            </div>
           </section>
         </div>
 

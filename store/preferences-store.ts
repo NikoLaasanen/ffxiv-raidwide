@@ -5,6 +5,7 @@ import type { JobAbbreviation } from "@/types/ffixiv-job";
 export type AbilityTarget = "self" | "party" | "single";
 export type AbilityType = "mitigation" | "utility" | "buff" | "interrupt" | "cleanse";
 export type TimelineViewMode = "full" | "my";
+export type MyPlanCompactStyle = "centered" | "classic";
 
 export interface UserPreferences {
   showAutoAttacks: boolean;
@@ -19,6 +20,7 @@ export interface UserPreferences {
   myTimelinePlayerJob: JobAbbreviation | null;
   myPlanDefaultJob: JobAbbreviation | null;
   myPlanCompactView: boolean;
+  myPlanCompactStyle: MyPlanCompactStyle;
 }
 
 interface PreferencesActions {
@@ -34,6 +36,7 @@ interface PreferencesActions {
   setMyTimelinePlayerJob: (v: JobAbbreviation | null) => void;
   setMyPlanDefaultJob: (v: JobAbbreviation | null) => void;
   setMyPlanCompactView: (v: boolean) => void;
+  setMyPlanCompactStyle: (v: MyPlanCompactStyle) => void;
   resetPreferences: () => void;
 }
 
@@ -50,6 +53,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   myTimelinePlayerJob: null,
   myPlanDefaultJob: null,
   myPlanCompactView: false,
+  myPlanCompactStyle: "centered",
 };
 
 export const usePreferencesStore = create<UserPreferences & PreferencesActions>()(
@@ -69,6 +73,7 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
       setMyTimelinePlayerJob: (v) => set({ myTimelinePlayerJob: v }),
       setMyPlanDefaultJob: (v) => set({ myPlanDefaultJob: v }),
       setMyPlanCompactView: (v) => set({ myPlanCompactView: v }),
+      setMyPlanCompactStyle: (v) => set({ myPlanCompactStyle: v }),
       resetPreferences: () => set(DEFAULT_PREFERENCES),
     }),
     {
@@ -87,6 +92,7 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
         myTimelinePlayerJob: state.myTimelinePlayerJob,
         myPlanDefaultJob: state.myPlanDefaultJob,
         myPlanCompactView: state.myPlanCompactView,
+        myPlanCompactStyle: state.myPlanCompactStyle,
       }),
     }
   )
