@@ -79,7 +79,12 @@ export const usePreferencesStore = create<UserPreferences & PreferencesActions>(
     {
       name: "ffxiv-raidwide-preferences",
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persistedState: unknown) => {
+        const state = persistedState as Record<string, unknown>;
+        const { timelineViewMode: _tv, myPlanIconsOnly: _mi, ...rest } = state;
+        return rest;
+      },
       partialize: (state) => ({
         showAutoAttacks: state.showAutoAttacks,
         showDamageColumn: state.showDamageColumn,
