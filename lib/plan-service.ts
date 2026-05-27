@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, query, where } from "firebase/firesto
 import { db } from "@/lib/firebase";
 import type { Plan } from "@/types/plan";
 import { upsertMyPlan } from "@/lib/my-plans-storage";
+import { COLLECTIONS } from "@/lib/db-collections";
 
 export async function savePlan(plan: Plan): Promise<void> {
   const res = await fetch("/api/plans", {
@@ -52,13 +53,13 @@ export async function updatePlan(plan: Plan): Promise<void> {
 }
 
 export async function getPlan(id: string): Promise<Plan | null> {
-  const ref = doc(db, "plans", id);
+  const ref = doc(db, COLLECTIONS.PLANS, id);
   const snap = await getDoc(ref);
   return snap.exists() ? (snap.data() as Plan) : null;
 }
 
 export async function getPlanByViewLink(viewLinkId: string): Promise<Plan | null> {
-  const q = query(collection(db, "plans"), where("viewLinkId", "==", viewLinkId));
+  const q = query(collection(db, COLLECTIONS.PLANS), where("viewLinkId", "==", viewLinkId));
   const snap = await getDocs(q);
   return snap.empty ? null : (snap.docs[0].data() as Plan);
 }

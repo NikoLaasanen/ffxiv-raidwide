@@ -14,24 +14,3 @@ type HealerSubRole = 'regen' | 'shield';
 type DpsSubRole = 'melee' | 'caster' | 'ranged';
 
 export type JobSubRole = TankSubRole | HealerSubRole | DpsSubRole;
-
-export type JobAbilityType = 'mitigation' | 'utility' | 'interrupt' | 'buff' | 'debuff';
-
-export interface JobAbility {
-    title: string,
-    type: JobAbilityType,
-    duration: number,
-    cooldown: number,
-    singletarget?: boolean
-}
-
-interface BaseJob {
-    title: string;
-    abbr: JobAbbreviation;
-    abilities: JobAbility[];
-}
-
-export type Job =
-    | (BaseJob & { role: 'tank'; subrole?: TankSubRole })
-    | (BaseJob & { role: 'healer'; subrole?: HealerSubRole })
-    | (BaseJob & { role: 'dps'; subrole?: DpsSubRole });

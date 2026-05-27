@@ -4,6 +4,7 @@ import type { PlayerCastEvent } from "@/types/fflogs";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { Plan } from "@/types/plan";
+import { getVisibleRows } from "@/lib/timeline-utils";
 
 export function parsePlanUrl(url: string): { kind: "view" | "edit"; id: string } | null {
   const viewMatch = /\/plan\/view\/([^/?#]+)/.exec(url);
@@ -33,7 +34,7 @@ export function castsToPlanAssignments({
     fflogsPlayers.map((p) => [p.id, p.job])
   );
 
-  const visibleRows = originalTimeline.filter((r) => !r.hidden);
+  const visibleRows = getVisibleRows(originalTimeline);
   const seen = new Set<string>();
   const result: MitigationAssignment[] = [];
 

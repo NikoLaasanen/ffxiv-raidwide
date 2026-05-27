@@ -10,22 +10,11 @@ import { ChevronDown, ChevronRight, ListX, User } from "lucide-react";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { cn } from "@/lib/utils";
 import { JOB_ROLE_COLOR, ALL_JOBS } from "@/lib/jobs";
+import { DAMAGE_TYPE_ICON, MECHANIC_BADGE, FALLBACK_JOB_COLOR } from "@/lib/timeline-constants";
 import Image from "next/image";
 import { usePreferencesStore } from "@/store/preferences-store";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const MECHANIC_BADGE: Partial<Record<MechanicType, { label: string; className: string }>> = {
-  enrage:     { label: "Enrage",     className: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" },
-  tankbuster: { label: "TB",         className: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400" },
-  party:      { label: "Party",      className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400" },
-  single:     { label: "Single",     className: "bg-zinc-100 text-zinc-500 dark:bg-slate-800 dark:text-slate-400" },
-};
-
-const DAMAGE_TYPE_ICON: Record<DamageType, string> = {
-  magical:  "/icons/MagicalDamage.png",
-  physical: "/icons/PhysicalDamage.png",
-  unique:   "/icons/UniqueDamage.png",
-};
 
 interface MyTimelineProps {
   players: Player[];
@@ -297,7 +286,7 @@ export function MyTimeline({
                         {abilityEntries.map(({ job, abilityId }, i) => {
                           const ability = abilityById.get(abilityId);
                           if (!ability) return null;
-                          const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                          const roleColor = JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR;
                           return (
                             <span key={`${abilityId}-${i}`} className="relative inline-flex items-center">
                               {isMultiJob && (
@@ -396,7 +385,7 @@ export function MyTimeline({
                           {abilityEntries.map(({ job, abilityId }, i) => {
                             const ability = abilityById.get(abilityId);
                             if (!ability) return null;
-                            const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                            const roleColor = JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR;
                             return (
                               <span
                                 key={`${abilityId}-${i}`}
@@ -433,7 +422,7 @@ export function MyTimeline({
                           abilityEntries.map(({ job, abilityId }, i) => {
                             const ability = abilityById.get(abilityId);
                             if (!ability) return null;
-                            const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                            const roleColor = JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR;
                             return (
                               <span key={`${abilityId}-${i}`} className="relative inline-flex items-center shrink-0">
                                 {isMultiJob && (
@@ -457,7 +446,7 @@ export function MyTimeline({
                           abilityEntries.map(({ job, abilityId }, i) => {
                             const ability = abilityById.get(abilityId);
                             if (!ability) return null;
-                            const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                            const roleColor = JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR;
                             return (
                               <span
                                 key={`${abilityId}-${i}`}

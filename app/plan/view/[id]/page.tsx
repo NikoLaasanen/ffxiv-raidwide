@@ -5,6 +5,7 @@ import { usePlanStore } from "@/store/plan-store";
 import { getPlanByViewLink } from "@/lib/plan-service";
 import { Timeline } from "@/components/timeline/Timeline";
 import { formatTimestamp } from "@/lib/format-timestamp";
+import { getVisibleRows } from "@/lib/timeline-utils";
 
 export default function PlanViewPage({
   params,
@@ -62,7 +63,7 @@ export default function PlanViewPage({
 
   if (!storePlan) return null;
 
-  const visibleRows = storePlan.timeline.filter((row) => !row.hidden);
+  const visibleRows = getVisibleRows(storePlan.timeline);
   const lastTs = storePlan.timeline.at(-1)?.timestamp ?? 0;
   const duration = formatTimestamp(lastTs);
 

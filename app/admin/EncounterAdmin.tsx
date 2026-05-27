@@ -6,20 +6,8 @@ import { formatTimestamp } from "@/lib/format-timestamp";
 import type { TimelineRow, MechanicType } from "@/types/timeline";
 import type { PhaseDivider } from "@/types/player";
 import type { DamageType } from "@/types/common";
-
-type EncounterType = "Ultimate" | "Savage" | "Criterion" | "Other";
-
-interface EncounterDoc {
-  id: string;
-  name: string;
-  type: EncounterType;
-  tier: string;
-  patch: string;
-  timeline: TimelineRow[];
-  phases: PhaseDivider[];
-  createdAt: number;
-  updatedAt: number;
-}
+import type { EncounterType, EncounterDoc } from "@/types/encounter";
+import { inputCls, selectCls } from "@/app/admin/admin-styles";
 
 type EditorRow = {
   timestamp: number;
@@ -38,10 +26,6 @@ type EditorPhase = {
   name: string;
 };
 
-const inputCls =
-  "px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-zinc-400";
-const selectCls =
-  "px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-400";
 
 function parseTimestampInput(value: string): number {
   const trimmed = value.trim();

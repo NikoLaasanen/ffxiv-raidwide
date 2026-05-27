@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
 import { getPlan, updatePlan } from "@/lib/plan-service";
 import { Timeline } from "@/components/timeline/Timeline";
+import { getVisibleRows } from "@/lib/timeline-utils";
 import { Button } from "@/components/ui/button";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import type { Plan } from "@/types/plan";
@@ -93,7 +94,7 @@ export default function PlanPage({
 
   if (!storePlan) return null;
 
-  const visibleRows = storePlan.timeline.filter((row) => !row.hidden);
+  const visibleRows = getVisibleRows(storePlan.timeline);
   const lastTs = storePlan.timeline.at(-1)?.timestamp ?? 0;
   const duration = formatTimestamp(lastTs);
 

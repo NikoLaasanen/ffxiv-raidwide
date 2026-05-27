@@ -7,11 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { JOB_GROUPS, JOB_NAMES, ALL_JOBS } from "@/lib/jobs";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
-import type { XivApiAction, JobAbilityRecord } from "@/types/job-ability";
+import type { XivApiAction, JobAbilityRecord, AbilityTarget, AbilityType } from "@/types/job-ability";
 import EncounterAdmin from "./EncounterAdmin";
-
-type AbilityTarget = "self" | "party" | "single";
-type AbilityType = "mitigation" | "utility" | "buff" | "interrupt" | "cleanse";
+import { inputCls, selectCls } from "@/app/admin/admin-styles";
 
 interface SavedAbility {
   xivapiId: number;
@@ -71,11 +69,6 @@ function toAbilityRecord(
     enabled: true,
   };
 }
-
-const inputCls =
-  "w-16 px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-transparent text-sm focus:outline-none focus:ring-1 focus:ring-zinc-400";
-const selectCls =
-  "px-2 py-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-1 focus:ring-zinc-400";
 
 const VALID_TABS = ["abilities", "encounters"] as const;
 type AdminTab = (typeof VALID_TABS)[number];
@@ -321,7 +314,7 @@ export default function AdminPage() {
                       min="0"
                       value={row.cooldownEdit}
                       onChange={(e) => updateRow(i, { cooldownEdit: e.target.value })}
-                      className={inputCls}
+                      className={inputCls + " w-16"}
                     />
                   </td>
                   <td className="px-3 py-1.5">
@@ -330,7 +323,7 @@ export default function AdminPage() {
                       min="0"
                       value={row.durationEdit}
                       onChange={(e) => updateRow(i, { durationEdit: e.target.value })}
-                      className={inputCls}
+                      className={inputCls + " w-16"}
                     />
                   </td>
                   <td className="px-3 py-1.5">
@@ -339,7 +332,7 @@ export default function AdminPage() {
                       min="0"
                       value={row.mitigationPhysical}
                       onChange={(e) => updateRow(i, { mitigationPhysical: e.target.value })}
-                      className={inputCls}
+                      className={inputCls + " w-16"}
                     />
                   </td>
                   <td className="px-3 py-1.5">
@@ -348,7 +341,7 @@ export default function AdminPage() {
                       min="0"
                       value={row.mitigationMagical}
                       onChange={(e) => updateRow(i, { mitigationMagical: e.target.value })}
-                      className={inputCls}
+                      className={inputCls + " w-16"}
                     />
                   </td>
                   <td className="px-3 py-1.5">

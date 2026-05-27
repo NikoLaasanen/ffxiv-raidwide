@@ -1,5 +1,8 @@
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 
+export type AbilityTarget = "self" | "party" | "single";
+export type AbilityType = "mitigation" | "utility" | "buff" | "interrupt" | "cleanse";
+
 export interface XivApiAction {
   xivapiId: number;
   name: string;
@@ -20,8 +23,8 @@ export interface JobAbilityRecord {
   duration: number;
   mitigationPhysical: number;
   mitigationMagical: number;
-  target: "self" | "party" | "single";
-  abilityType: "mitigation" | "utility" | "buff" | "interrupt" | "cleanse";
+  target: AbilityTarget;
+  abilityType: AbilityType;
   isRoleAction: boolean;
   enabled: boolean;
   createdAt: number;

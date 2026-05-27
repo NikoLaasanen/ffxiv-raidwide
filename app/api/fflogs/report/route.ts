@@ -13,6 +13,8 @@ import type { JobAbbreviation } from "@/types/ffixiv-job";
 import { fflogsGraphQL } from "@/lib/fflogs-client";
 import { FFLOGS_JOB_MAP } from "@/lib/jobs";
 import { adminDb } from "@/lib/firebase-admin";
+import { apiError } from "@/lib/api-error";
+import { COLLECTIONS } from "@/lib/db-collections";
 import {
   FIGHT_META_QUERY,
   ALL_FIGHTS_QUERY,
@@ -313,7 +315,7 @@ export async function POST(request: Request): Promise<Response> {
     let phases: PhaseDivider[] = [];
 
     const fightNameLower = fight.name.toLowerCase();
-    const encounterSnap = await adminDb.collection("encounters").get();
+    const encounterSnap = await adminDb.collection(COLLECTIONS.ENCOUNTERS).get();
     const matchedDoc = encounterSnap.docs.find(
       (d) => (d.data().name as string).toLowerCase() === fightNameLower
     );
@@ -350,7 +352,6 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json({ reportCode, fight, players, timeline, casts, encounterId, phases });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(err);
   }
 }

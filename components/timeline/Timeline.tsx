@@ -9,6 +9,7 @@ import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { PlayerCastEvent } from "@/types/fflogs";
 import { JOB_NAMES, JOB_GROUPS, ALL_JOBS, JOB_ROLE_COLOR } from "@/lib/jobs";
+import { DAMAGE_TYPE_ICON, MECHANIC_BADGE, FALLBACK_JOB_COLOR } from "@/lib/timeline-constants";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { computeAssignments } from "@/lib/compute-assignments";
 import { cn } from "@/lib/utils";
@@ -59,23 +60,8 @@ type DisplayItem =
 
 const TYPE_CYCLE: DamageType[] = ["magical", "physical", "unique"];
 
-
-const DAMAGE_TYPE_ICON: Record<DamageType, string> = {
-  magical:  "/icons/MagicalDamage.png",
-  physical: "/icons/PhysicalDamage.png",
-  unique:   "/icons/UniqueDamage.png",
-};
-
 const TH_BASE = "px-3 py-2.5 text-center font-medium text-zinc-500 dark:text-slate-400";
 const TH_FIXED = "px-4 py-2.5 text-left font-medium text-zinc-500 dark:text-slate-400";
-
-const MECHANIC_BADGE: Record<MechanicType, { label: string; className: string }> = {
-  enrage:     { label: "Enrage",     className: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400" },
-  tankbuster: { label: "Tankbuster", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400" },
-  party:      { label: "Party",      className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400" },
-  single:     { label: "Single",     className: "bg-zinc-100 text-zinc-500 dark:bg-slate-800 dark:text-slate-400" },
-  unknown:    { label: "—",          className: "text-zinc-300 dark:text-slate-600" },
-};
 
 type ActivePeriod = { start: number; end: number };
 type PlayerRanges = {
@@ -1201,7 +1187,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             <div className="flex flex-wrap gap-1.5">
               {allJobs.map((job) => {
                 const active = myPlanEditJobs.includes(job);
-                const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                const roleColor = JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR;
                 return (
                   <button
                     key={job}
@@ -1215,7 +1201,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                         : "bg-white dark:bg-slate-900 border-zinc-200 dark:border-slate-700 text-zinc-400 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-slate-600"
                     )}
                   >
-                    <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: active ? roleColor : "#94a3b8" }} />
+                    <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: active ? roleColor : FALLBACK_JOB_COLOR }} />
                     {job}
                   </button>
                 );
@@ -1249,7 +1235,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             <div className="flex flex-wrap gap-1.5">
               {allJobs.map((job) => {
                 const active = myPlanViewJobs.includes(job);
-                const roleColor = JOB_ROLE_COLOR[job] ?? "#94a3b8";
+                const roleColor = JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR;
                 return (
                   <button
                     key={job}
@@ -1263,7 +1249,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                         : "bg-white dark:bg-slate-900 border-zinc-200 dark:border-slate-700 text-zinc-400 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-slate-600"
                     )}
                   >
-                    <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: active ? roleColor : "#94a3b8" }} />
+                    <span className="w-1 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: active ? roleColor : FALLBACK_JOB_COLOR }} />
                     {job}
                   </button>
                 );
@@ -1577,7 +1563,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               >
                 <span
                   className="w-1 h-3.5 rounded-sm shrink-0"
-                  style={{ backgroundColor: JOB_ROLE_COLOR[job] ?? '#94a3b8' }}
+                  style={{ backgroundColor: JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR }}
                 />
                 {job}
                 <span className="text-zinc-400 dark:text-slate-500 ml-0.5 leading-none">×</span>

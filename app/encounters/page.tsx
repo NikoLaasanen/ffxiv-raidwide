@@ -4,18 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { usePlanStore } from "@/store/plan-store";
-import type { TimelineRow } from "@/types/timeline";
-import type { PhaseDivider } from "@/types/player";
-
-interface EncounterDoc {
-  id: string;
-  name: string;
-  type: string;
-  tier: string;
-  patch: string;
-  timeline: TimelineRow[];
-  phases: PhaseDivider[];
-}
+import type { EncounterDoc } from "@/types/encounter";
 
 const TYPE_BADGE: Record<string, string> = {
   Ultimate: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",

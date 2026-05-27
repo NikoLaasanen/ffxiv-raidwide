@@ -1,4 +1,6 @@
 import { adminDb } from "@/lib/firebase-admin";
+import { apiError } from "@/lib/api-error";
+import { COLLECTIONS } from "@/lib/db-collections";
 
 export async function DELETE(
   _request: Request,
@@ -6,9 +8,9 @@ export async function DELETE(
 ): Promise<Response> {
   try {
     const { id } = await params;
-    await adminDb.collection("encounters").doc(id).delete();
+    await adminDb.collection(COLLECTIONS.ENCOUNTERS).doc(id).delete();
     return Response.json({ ok: true });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
+    return apiError(err);
   }
 }

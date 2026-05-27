@@ -2,9 +2,10 @@ import { collection, doc, getDocs, query, where, writeBatch } from "firebase/fir
 import { db } from "@/lib/firebase";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
+import { COLLECTIONS } from "@/lib/db-collections";
 
 export async function getJobAbilities(job: JobAbbreviation): Promise<JobAbilityRecord[]> {
-  const q = query(collection(db, "job_abilities"), where("jobs", "array-contains", job));
+  const q = query(collection(db, COLLECTIONS.JOB_ABILITIES), where("jobs", "array-contains", job));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobAbilityRecord));
 }
@@ -15,7 +16,7 @@ export async function saveJobAbilities(
   const batch = writeBatch(db);
   const now = Date.now();
   for (const ability of abilities) {
-    const ref = doc(db, "job_abilities", ability.id);
+    const ref = doc(db, COLLECTIONS.JOB_ABILITIES, ability.id);
     batch.set(ref, { ...ability, createdAt: now, updatedAt: now });
   }
   await batch.commit();

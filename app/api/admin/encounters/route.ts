@@ -1,6 +1,8 @@
 import { adminDb } from "@/lib/firebase-admin";
 import type { TimelineRow } from "@/types/timeline";
 import type { PhaseDivider } from "@/types/player";
+import { apiError } from "@/lib/api-error";
+import { COLLECTIONS } from "@/lib/db-collections";
 
 interface EncounterPayload {
   id?: string;
@@ -14,11 +16,11 @@ interface EncounterPayload {
 
 export async function GET(): Promise<Response> {
   try {
-    const snap = await adminDb.collection("encounters").orderBy("createdAt", "desc").get();
+    const snap = await adminDb.collection(COLLECTIONS.ENCOUNTERS).orderBy("createdAt", "desc").get();
     const encounters = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     return Response.json({ encounters });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
+    return apiError(err);
   }
 }
 
@@ -31,7 +33,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const now = Date.now();
     const docId = id || crypto.randomUUID();
-    const ref = adminDb.collection("encounters").doc(docId);
+    const ref = adminDb.collection(COLLECTIONS.ENCOUNTERS).doc(docId);
     const existing = await ref.get();
 
     await ref.set({
@@ -48,6 +50,6 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json({ id: docId });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
+    return apiError(err);
   }
 }

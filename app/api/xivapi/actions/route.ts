@@ -1,13 +1,8 @@
 import type { XivApiAction } from "@/types/job-ability";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
+import { ALL_JOBS } from "@/lib/jobs";
 
-const VALID_JOBS = new Set<JobAbbreviation>([
-  "PLD", "WAR", "DRK", "GNB",
-  "WHM", "SCH", "AST", "SGE",
-  "DRG", "MNK", "NIN", "SAM", "RPR", "VPR",
-  "BRD", "MCH", "DNC",
-  "BLM", "SMN", "RDM", "PCT",
-]);
+const VALID_JOBS = new Set<JobAbbreviation>(ALL_JOBS);
 
 // Jobs that inherit low-level actions from a base class
 const BASE_CLASS: Partial<Record<JobAbbreviation, string>> = {

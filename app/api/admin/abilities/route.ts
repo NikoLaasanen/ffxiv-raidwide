@@ -1,5 +1,7 @@
 import { adminDb } from "@/lib/firebase-admin";
 import type { JobAbilityRecord } from "@/types/job-ability";
+import { apiError } from "@/lib/api-error";
+import { COLLECTIONS } from "@/lib/db-collections";
 
 export async function GET(request: Request) {
   try {
@@ -8,7 +10,7 @@ export async function GET(request: Request) {
     if (!job) return Response.json({ error: "Missing job param" }, { status: 400 });
 
     const snapshot = await adminDb
-      .collection("job_abilities")
+      .collection(COLLECTIONS.JOB_ABILITIES)
       .where("jobs", "array-contains", job)
       .get();
 
@@ -25,10 +27,7 @@ export async function GET(request: Request) {
     });
     return Response.json({ abilities });
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 500 }
-    );
+    return apiError(e);
   }
 }
 
@@ -40,16 +39,13 @@ export async function POST(request: Request) {
     const now = Date.now();
 
     for (const ability of abilities) {
-      const ref = adminDb.collection("job_abilities").doc(ability.id);
+      const ref = adminDb.collection(COLLECTIONS.JOB_ABILITIES).doc(ability.id);
       batch.set(ref, { ...ability, createdAt: now, updatedAt: now });
     }
 
     await batch.commit();
     return Response.json({ saved: abilities.length });
   } catch (e) {
-    return Response.json(
-      { error: e instanceof Error ? e.message : String(e) },
-      { status: 500 }
-    );
+    return apiError(e);
   }
 }

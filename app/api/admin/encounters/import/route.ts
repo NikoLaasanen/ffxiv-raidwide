@@ -10,6 +10,7 @@ import {
   ENRAGE_DAMAGE_THRESHOLD,
 } from "@/lib/fflogs-timeline";
 import { FFLOGS_JOB_MAP } from "@/lib/jobs";
+import { apiError } from "@/lib/api-error";
 import type { FFLogsMetaResponse, FFLogsFight } from "@/types/fflogs";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 
@@ -79,6 +80,6 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json({ timeline, fightName: fight.name });
   } catch (err) {
-    return Response.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
+    return apiError(err);
   }
 }

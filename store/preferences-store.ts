@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
+import type { AbilityTarget, AbilityType } from "@/types/job-ability";
 
-export type AbilityTarget = "self" | "party" | "single";
-export type AbilityType = "mitigation" | "utility" | "buff" | "interrupt" | "cleanse";
+export type { AbilityTarget, AbilityType };
 export type TimelineViewMode = "full" | "my";
 export type MyPlanCompactStyle = "centered" | "classic";
 

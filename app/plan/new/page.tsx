@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Timeline } from "@/components/timeline/Timeline";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { savePlan } from "@/lib/plan-service";
+import { getVisibleRows } from "@/lib/timeline-utils";
 import type { MitigationAssignment } from "@/types/timeline";
 import type { PhaseDivider } from "@/types/player";
 
@@ -40,7 +41,7 @@ export default function NewPlanPage() {
   if (!hasHydrated || !pendingImport) return null;
 
   const { reportCode, fight, players, timeline, encounterId } = pendingImport;
-  const visibleRows = timeline.filter((row) => !row.hidden);
+  const visibleRows = getVisibleRows(timeline);
   const duration = formatTimestamp(fight.endTime - fight.startTime);
   const fflogsUrl = `https://www.fflogs.com/reports/${reportCode}#fight=${fight.id}`;
 
