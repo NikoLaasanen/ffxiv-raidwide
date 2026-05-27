@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-80 -80 160 160" width="160" height="160" role="img">
+  <title>Raidwide Planner</title>
+  <desc>Boss circle surrounded by 8 player circles – FFXIV Raidwide Planner logo</desc>
+  <!-- Boss -->
+  <circle cx="0" cy="0" r="22" fill="#00d7c1"/>
+  <!-- Players (outline) -->
+  <circle cx="0"   cy="-52" r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle cx="37"  cy="-37" r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle cx="52"  cy="0"   r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle cx="37"  cy="37"  r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle cx="0"   cy="52"  r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle cx="-37" cy="37"  r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle cx="-52" cy="0"   r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle cx="-37" cy="-37" r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+</svg>

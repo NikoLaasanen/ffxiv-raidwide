@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-80 -80 160 160" width="160" height="160" role="img">
+  <title>Raidwide Planner</title>
+  <desc>Boss circle with 8 player circles popping in clockwise from top</desc>
+
+  <style>
+    .player {
+      transform-origin: center;
+      transform-box: fill-box;
+      opacity: 0;
+      animation: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+    @keyframes pop {
+      0%   { opacity: 0; transform: scale(0); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .boss {
+      transform-origin: center;
+      transform-box: fill-box;
+      opacity: 0;
+      animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s forwards;
+    }
+
+    .p1 { animation-delay: 0.5s; }
+    .p2 { animation-delay: 0.72s; }
+    .p3 { animation-delay: 0.94s; }
+    .p4 { animation-delay: 1.16s; }
+    .p5 { animation-delay: 1.38s; }
+    .p6 { animation-delay: 1.60s; }
+    .p7 { animation-delay: 1.82s; }
+    .p8 { animation-delay: 2.04s; }
+  </style>
+
+  <!-- Boss -->
+  <circle class="boss" cx="0" cy="0" r="22" fill="#00d7c1"/>
+
+  <!-- Players, clockwise from top -->
+  <circle class="player p1" cx="0"   cy="-52" r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle class="player p2" cx="37"  cy="-37" r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle class="player p3" cx="52"  cy="0"   r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle class="player p4" cx="37"  cy="37"  r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle class="player p5" cx="0"   cy="52"  r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle class="player p6" cx="-37" cy="37"  r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle class="player p7" cx="-52" cy="0"   r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+  <circle class="player p8" cx="-37" cy="-37" r="8" fill="none" stroke="#00d7c1" stroke-width="1.8"/>
+</svg>

@@ -36,7 +36,8 @@ export default function MyPlansPage() {
   );
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-10">
+    <main className="flex-1">
+      <div className="max-w-[1180px] mx-auto px-6 py-10">
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-1">
         My Plans
       </h1>
@@ -145,6 +146,7 @@ export default function MyPlansPage() {
           </ul>
         )}
       </section>
+      </div>
     </main>
   );
 }

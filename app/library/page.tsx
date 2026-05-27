@@ -72,7 +72,8 @@ export default function LibraryPage() {
   const { abilitiesByJob, isLoading } = useJobAbilities(ALL_JOBS, { includeDisabled: true });
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="flex-1">
+      <div className="max-w-[1180px] mx-auto px-6 py-10">
       <h1 className="text-2xl font-bold">Ability Library</h1>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
         All job abilities grouped by role. Dimmed rows are disabled.
@@ -95,7 +96,7 @@ export default function LibraryPage() {
 
                 <div className="flex flex-col gap-6">
                   {group.jobs.map((job) => {
-                    const abilities = abilitiesByJob[job] ?? [];
+                    const abilities = (abilitiesByJob[job] ?? []).filter(a => !a.isRoleAction);
                     if (abilities.length === 0) return null;
 
                     return (
@@ -135,12 +136,55 @@ export default function LibraryPage() {
                       </div>
                     );
                   })}
+
+                  {(() => {
+                    const roleActions = Object.values(
+                      group.jobs
+                        .flatMap(job => (abilitiesByJob[job] ?? []).filter(a => a.isRoleAction))
+                        .reduce<Record<string, JobAbilityRecord>>((acc, a) => {
+                          acc[a.id] ??= a;
+                          return acc;
+                        }, {})
+                    );
+                    if (roleActions.length === 0) return null;
+                    return (
+                      <div>
+                        <div className="flex items-baseline gap-2 mb-1.5 px-1">
+                          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: roleColor }}>
+                            Role
+                          </span>
+                          <span className="text-sm font-medium">Role Actions</span>
+                          <span className="text-xs text-zinc-400">{roleActions.length} abilities</span>
+                        </div>
+                        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                                <th className="px-3 py-1.5 w-10" />
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400">Name</th>
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 w-24">Type</th>
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 w-16">Target</th>
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 w-16">CD</th>
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 w-16">Duration</th>
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 w-16">Phys</th>
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 w-16">Mag</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {roleActions.map(a => <AbilityRow key={a.id} ability={a} />)}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </section>
             );
           })}
         </div>
       )}
+      </div>
     </main>
   );
 }

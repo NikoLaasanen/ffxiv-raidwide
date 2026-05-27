@@ -17,6 +17,7 @@ export async function savePlan(plan: Plan): Promise<void> {
       editLinkId: plan.editLinkId,
       viewLinkId: plan.viewLinkId,
       encounterId: plan.encounterId,
+      encounterType: plan.encounterType,
       updatedAt: plan.updatedAt,
       savedAt: Date.now(),
     });

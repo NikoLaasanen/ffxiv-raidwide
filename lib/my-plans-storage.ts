@@ -1,4 +1,5 @@
 import { createLocalStorage } from "@/lib/local-storage";
+import type { EncounterType } from "@/types/encounter";
 
 export interface MyPlanEntry {
   id: string;
@@ -6,6 +7,7 @@ export interface MyPlanEntry {
   editLinkId: string;
   viewLinkId: string;
   encounterId: string | null;
+  encounterType: EncounterType | null;
   updatedAt: number;
   savedAt: number;
 }

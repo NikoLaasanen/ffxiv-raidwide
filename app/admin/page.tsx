@@ -163,7 +163,8 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="p-8 max-w-[1400px] min-w-[900px] mx-auto">
+    <main className="flex-1 overflow-x-auto">
+      <div className="max-w-[1180px] min-w-[900px] mx-auto px-6 py-10">
       <h1 className="text-2xl font-bold mb-1">Admin</h1>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
@@ -376,6 +377,7 @@ export default function AdminPage() {
       )}
         </TabsContent>
       </Tabs>
+      </div>
     </main>
   );
 }
