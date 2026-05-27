@@ -57,8 +57,9 @@ The app is designed to be usable without authentication, with optional cloud fea
 - FFLogs URL input
 - "Import encounter" button
 - Recently viewed plans (localStorage)
-- Create new empty plan
-- Optional: quick links to saved plans
+- Create new empty plan → `/plan/new`
+- Encounter tiles grouped by tier
+- Monogram logo + ⌘K command palette + New Plan button in header
 
 ### 3.2 My Plans (/my-plans)
 
@@ -131,6 +132,10 @@ Route param `id` is the `viewLinkId`. Loaded via `getPlanByViewLink()` — a Fir
 - If the `viewLinkId` is invalid or the plan was deleted, shows a "Plan not found" error state
 - Uses the same Zustand plan store as the edit page (skips fetch if `storePlan.viewLinkId` already matches)
 
+### 3.3b Plan New Page (/plan/new)
+
+Renders the plan editor in "new plan" mode — no Firestore fetch, starts with an empty plan. Saves to Firestore on first explicit save, generating `editLinkId` / `viewLinkId` and redirecting to `/plan/{editLinkId}`.
+
 ### 3.4 Ability Library (/library)
 
 **Features:**
@@ -164,6 +169,15 @@ Route param `id` is the `viewLinkId`. Loaded via `getPlanByViewLink()` — a Fir
 - Allows:
   - Adding encounter presets
   - Editing preset metadata
+
+### 3.5b Admin Panel (/admin)
+
+**Features:**
+
+- Manage `job_abilities` collection: add, edit, delete ability records via XIVAPI lookup
+- Manage `encounters` collection: add/edit encounter presets and their timelines
+- Bulk import encounters
+- No authentication required — guarded by a local flag or environment variable
 
 ### 3.6 Plan Comparison (/plan/[id]/compare)
 
@@ -210,16 +224,25 @@ Route param `id` is the `viewLinkId`. Loaded via `getPlanByViewLink()` — a Fir
 id: string
 title: string
 encounterId: string | null
+encounterType: EncounterType | null    // "Ultimate" | "Savage" | "Criterion" | "Other"
+encounterTier: string | null
 raidplanLink: string | null
 timeline: TimelineRow[]
 players: Player[]
 phases: PhaseDivider[]
-settings: PlanSettings
-versionHistory: VersionEvent[]
-createdAt: timestamp
-updatedAt: timestamp
+assignments?: MitigationAssignment[]
+createdAt: number                      // Unix ms
+updatedAt: number                      // Unix ms
 editLinkId: string
 viewLinkId: string
+```
+
+### PlanSettings
+
+```typescript
+hideAutoAttacks: boolean
+showMitigationCalculations: boolean
+defaultDamageType: DamageType          // "physical" | "magical" | "unique"
 ```
 
 ### TimelineRow
@@ -228,10 +251,12 @@ viewLinkId: string
 timestamp: number
 bossAbility: string
 damageEvent?: DamageEvent
-playerMistakes: Record<playerId, PlayerMistakeState>
+playerMistakes: Record<string, PlayerMistakeState>
 hidden: boolean
 sourceName?: string       // ability source name from FFLogs
 mechanicType?: MechanicType
+cleanse?: boolean
+interrupt?: boolean
 ```
 
 ### MechanicType
@@ -296,6 +321,20 @@ mitigationPercent: number
 type: "physical" | "magical" | "all"
 target: "self" | "party" | "tank"
 enabled: boolean
+```
+
+### EncounterDoc (Firestore — `encounters` collection)
+
+```typescript
+id: string
+name: string
+type: EncounterType                   // "Ultimate" | "Savage" | "Criterion" | "Other"
+tier: string
+patch: string
+timeline: TimelineRow[]
+phases: PhaseDivider[]
+createdAt: number
+updatedAt: number
 ```
 
 ### JobAbilityRecord (Firestore — `job_abilities` collection)
@@ -375,10 +414,12 @@ collapsed: boolean
 
 ### LocalStorage
 
-- Preferences
-- Hidden events
-- Ability visibility
-- Recently viewed plans
+| Key | Contents |
+|---|---|
+| `ffxiv-raidwide-my-plans` | `MyPlanEntry[]` — plans saved by the user (capped at 50, sorted by `savedAt` desc) |
+| `ffxiv-raidwide-favorites` | `FavoriteEntry[]` — favorited plans |
+| `ffxiv-raidwide-plan` | Zustand plan store state (partial hydration) |
+| `ffxiv-raidwide-preferences` | `UserPreferences` — persisted UI preferences |
 
 ### Firestore
 

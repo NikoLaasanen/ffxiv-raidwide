@@ -17,10 +17,13 @@ Plan documents. Created when a user saves a plan for the first time.
 | `id` | `string` | Same as document ID |
 | `title` | `string` | Plan title |
 | `encounterId` | `string \| null` | Reference to an encounter preset |
+| `encounterType` | `EncounterType \| null` | `"Ultimate" \| "Savage" \| "Criterion" \| "Other"` |
+| `encounterTier` | `string \| null` | Raid tier label (e.g. `"AAC Light-heavyweight M"`) |
 | `raidplanLink` | `string \| null` | External raidplan.io URL |
 | `timeline` | `TimelineRow[]` | Ordered list of boss ability rows |
 | `players` | `Player[]` | Players with their assigned abilities |
 | `phases` | `PhaseDivider[]` | Phase divider rows |
+| `assignments` | `MitigationAssignment[] \| undefined` | Explicit mitigation assignments (optional) |
 | `createdAt` | `number` | Unix ms |
 | `updatedAt` | `number` | Unix ms |
 | `editLinkId` | `string` | UUID for edit access |
@@ -37,9 +40,11 @@ Encounter presets, editable via admin panel. Grouped by raid tier.
 | Field | Type | Description |
 |---|---|---|
 | `name` | `string` | Boss / encounter name |
-| `tier` | `string` | Raid tier (e.g. "AAC Light-heavyweight M") |
+| `type` | `EncounterType` | `"Ultimate" \| "Savage" \| "Criterion" \| "Other"` |
+| `tier` | `string` | Raid tier (e.g. `"AAC Light-heavyweight M"`) |
 | `patch` | `string` | Game patch version |
 | `timeline` | `TimelineRow[]` | Preset timeline for this encounter |
+| `phases` | `PhaseDivider[]` | Phase dividers for this encounter |
 | `createdAt` | `number` | Unix ms |
 | `updatedAt` | `number` | Unix ms |
 

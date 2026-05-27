@@ -26,12 +26,16 @@ An interactive raid mitigation planner for Final Fantasy XIV. Build cooldown pla
 
 | Route | Purpose |
 |---|---|
-| `/` | Homepage: FFLogs URL import, recently viewed plans, create new |
+| `/` | Homepage: FFLogs URL import, recently viewed plans, create new plan |
+| `/plan/new` | Create a new empty plan |
 | `/plan/[id]` | Core plan editor: timeline, mitigation assignment, cooldown logic |
+| `/plan/view/[id]` | Read-only shared view of a plan (via `viewLinkId`) |
 | `/plan/[id]/compare` | Overlay FFLogs execution on planned timeline |
 | `/plan/[id]/mistakes` | Death/vuln/damage-down timeline and per-player summary |
+| `/my-plans` | All plans saved by the user (localStorage) |
 | `/library` | Ability library: toggle abilities per job |
 | `/encounters` | Encounter presets browser, grouped by raid tier |
+| `/admin` | Admin panel: manage job abilities and encounter presets |
 
 ## Getting Started
 
