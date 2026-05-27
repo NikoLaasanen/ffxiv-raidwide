@@ -638,13 +638,6 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     if (myPlanDefaultJob && allJobs.includes(myPlanDefaultJob)) return [myPlanDefaultJob];
     return allJobs.length ? [allJobs[0]] : [];
   });
-  useEffect(() => {
-    setMyPlanViewJobs((prev) => {
-      const existing = new Set(prev);
-      const missing = allJobs.filter((j) => !existing.has(j));
-      return missing.length ? [...prev, ...missing] : prev;
-    });
-  }, [allJobs]);
   const { abilitiesByJob, isLoading } = useJobAbilities(allJobs);
   const initializedRef = useRef(!!initialAssignments?.length);
   const [assignments, setAssignments] = useState<MitigationAssignment[]>(
@@ -698,11 +691,15 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     setElapsedMs(0);
   }
 
+  const mySelectedPlayers = useMemo(
+    () => localPlayers.filter((p) => myPlanViewJobs.includes(p.job)),
+    [localPlayers, myPlanViewJobs]
+  );
+
   const { myCurrentRow, myNextRow } = useMemo(() => {
-    if (!myTimelinePlayerJob) return { myCurrentRow: null, myNextRow: null };
-    const player = localPlayers.find((p) => p.job === myTimelinePlayerJob) ?? null;
-    if (!player) return { myCurrentRow: null, myNextRow: null };
-    const ts = new Set(assignments.filter((a) => a.playerId === player.id).map((a) => a.timestamp));
+    if (mySelectedPlayers.length === 0) return { myCurrentRow: null, myNextRow: null };
+    const playerIds = new Set(mySelectedPlayers.map((p) => p.id));
+    const ts = new Set(assignments.filter((a) => playerIds.has(a.playerId)).map((a) => a.timestamp));
     const assigned = localTimeline.filter((r) => !r.hidden && ts.has(r.timestamp));
     let current: TimelineRow | null = null;
     for (const r of assigned) {
@@ -711,14 +708,13 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     }
     const next = assigned.find((r) => r.timestamp > elapsedMs) ?? null;
     return { myCurrentRow: current, myNextRow: next };
-  }, [myTimelinePlayerJob, localPlayers, assignments, localTimeline, elapsedMs]);
+  }, [mySelectedPlayers, assignments, localTimeline, elapsedMs]);
 
   const myNextRowAbilities = useMemo(() => {
-    if (!myNextRow || !myTimelinePlayerJob) return [];
-    const player = localPlayers.find((p) => p.job === myTimelinePlayerJob);
-    if (!player) return [];
+    if (!myNextRow || mySelectedPlayers.length === 0) return [];
+    const playerIds = new Set(mySelectedPlayers.map((p) => p.id));
     const abilityIds = new Set(
-      assignments.filter((a) => a.playerId === player.id && a.timestamp === myNextRow.timestamp).map((a) => a.abilityId)
+      assignments.filter((a) => playerIds.has(a.playerId) && a.timestamp === myNextRow.timestamp).map((a) => a.abilityId)
     );
     const seen = new Set<string>();
     return Object.values(abilitiesByJob).flat().filter((ab) => {
@@ -726,16 +722,15 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       seen.add(ab.id);
       return true;
     });
-  }, [myNextRow, myTimelinePlayerJob, localPlayers, assignments, abilitiesByJob]);
+  }, [myNextRow, mySelectedPlayers, assignments, abilitiesByJob]);
 
   const myNextRowFollowups = useMemo(() => {
-    if (!myNextRow || !myTimelinePlayerJob) return [];
-    const player = localPlayers.find((p) => p.job === myTimelinePlayerJob);
-    if (!player) return [];
+    if (!myNextRow || mySelectedPlayers.length === 0) return [];
+    const playerIds = new Set(mySelectedPlayers.map((p) => p.id));
     const cutoff = myNextRow.timestamp + 5000;
     const byTimestamp = new Map<number, Set<string>>();
     for (const a of assignments) {
-      if (a.playerId === player.id && a.timestamp > myNextRow.timestamp && a.timestamp <= cutoff) {
+      if (playerIds.has(a.playerId) && a.timestamp > myNextRow.timestamp && a.timestamp <= cutoff) {
         if (!byTimestamp.has(a.timestamp)) byTimestamp.set(a.timestamp, new Set());
         byTimestamp.get(a.timestamp)!.add(a.abilityId);
       }
@@ -755,11 +750,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       });
       return { row, abilities };
     }).filter((f) => f.abilities.length > 0);
-  }, [myNextRow, myTimelinePlayerJob, localPlayers, assignments, localTimeline, abilitiesByJob]);
-
-  useEffect(() => {
-    if (readOnly) setMyTimelinePlayerJob(myPlanViewJobs[0] ?? null);
-  }, [readOnly, myPlanViewJobs, setMyTimelinePlayerJob]);
+  }, [myNextRow, mySelectedPlayers, assignments, localTimeline, abilitiesByJob]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.location.hash === "#my-plan") {
@@ -1107,7 +1098,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               <button
                 onClick={() => setTimelineViewMode("full")}
                 className={cn(
-                  "px-3 py-1.5 transition-colors",
+                  "px-3 py-1.5 transition-colors cursor-pointer",
                   timelineViewMode === "full"
                     ? "bg-teal-600 dark:bg-teal-700 text-white"
                     : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
@@ -1118,7 +1109,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               <button
                 onClick={() => setTimelineViewMode("my")}
                 className={cn(
-                  "px-3 py-1.5 transition-colors border-l border-zinc-200 dark:border-slate-700",
+                  "px-3 py-1.5 transition-colors border-l border-zinc-200 dark:border-slate-700 cursor-pointer",
                   timelineViewMode === "my"
                     ? "bg-teal-600 dark:bg-teal-700 text-white"
                     : "bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 hover:bg-zinc-50 dark:hover:bg-slate-800"
@@ -1218,7 +1209,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                       active ? prev.filter((j) => j !== job) : [...prev, job]
                     )}
                     className={cn(
-                      "inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border transition-colors",
+                      "inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border transition-colors cursor-pointer",
                       active
                         ? "bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500"
                         : "bg-white dark:bg-slate-900 border-zinc-200 dark:border-slate-700 text-zinc-400 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-slate-600"
@@ -1233,7 +1224,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             {myPlanEditJobs.length < allJobs.length && (
               <button
                 onClick={() => setMyPlanEditJobs(allJobs)}
-                className="text-xs text-teal-600 dark:text-teal-400 hover:underline shrink-0"
+                className="text-xs text-teal-600 dark:text-teal-400 hover:underline shrink-0 cursor-pointer"
               >
                 All
               </button>
@@ -1266,7 +1257,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                       active ? prev.filter((j) => j !== job) : [...prev, job]
                     )}
                     className={cn(
-                      "inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border transition-colors",
+                      "inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border transition-colors cursor-pointer",
                       active
                         ? "bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500"
                         : "bg-white dark:bg-slate-900 border-zinc-200 dark:border-slate-700 text-zinc-400 dark:text-slate-500 hover:border-zinc-300 dark:hover:border-slate-600"
@@ -1281,7 +1272,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             {myPlanViewJobs.length < allJobs.length && (
               <button
                 onClick={() => setMyPlanViewJobs(allJobs)}
-                className="text-xs text-teal-600 dark:text-teal-400 hover:underline shrink-0"
+                className="text-xs text-teal-600 dark:text-teal-400 hover:underline shrink-0 cursor-pointer"
               >
                 All
               </button>
@@ -1364,7 +1355,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               <button
                 onClick={handlePlayPause}
                 title={isRunning ? "Pause timer" : "Play timer"}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 dark:border-teal-700 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 dark:border-teal-700 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors cursor-pointer"
                 aria-label={isRunning ? "Pause timer" : "Play timer"}
               >
                 {isRunning ? <Pause size={13} /> : <Play size={13} />}
@@ -1372,7 +1363,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               <button
                 onClick={handleReset}
                 title="Reset timer"
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 dark:border-teal-700 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-teal-200 dark:border-teal-700 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors cursor-pointer"
                 aria-label="Reset timer"
               >
                 <RotateCcw size={13} />
@@ -1554,7 +1545,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             timeline={localTimeline}
             phases={localPhases}
             assignments={assignments}
-            abilitiesByJob={abilitiesByJob}
+            abilitiesByJob={filteredAbilitiesByJob}
             selectedJobs={readOnly ? myPlanViewJobs : myPlanEditJobs}
             currentTimestamp={readOnly ? (myNextRow?.timestamp ?? null) : null}
             onTogglePhase={stableTogglePhase}

@@ -189,14 +189,13 @@ export function MyTimeline({
         lastPhaseIdx = currentPhaseIdx;
       }
       if (currentPhaseIdx >= 0 && sortedPhases[currentPhaseIdx].collapsed) continue;
-      items.push({
-        kind: "row",
-        row,
-        abilityEntries: assignmentsByTimestamp.get(row.timestamp) ?? [],
-      });
+      const abilityEntries = (assignmentsByTimestamp.get(row.timestamp) ?? [])
+        .filter(({ abilityId }) => abilityById.has(abilityId));
+      if (abilityEntries.length === 0) continue;
+      items.push({ kind: "row", row, abilityEntries });
     }
     return items;
-  }, [myRows, phases, timeline, assignmentsByTimestamp]);
+  }, [myRows, phases, timeline, assignmentsByTimestamp, abilityById]);
 
   const hasNoAssignments = selectedPlayers.length > 0 && myRows.length === 0;
   const usedCount = playerAbilities.filter((a) => (usageByAbility.get(a.id) ?? 0) > 0).length;
