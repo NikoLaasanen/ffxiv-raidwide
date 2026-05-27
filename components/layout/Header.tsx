@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { Sun, Moon, Plus } from "lucide-react";
+import { Sun, Moon, Plus, Menu, X } from "lucide-react";
 
 const navLinks = [
   { href: "/my-plans", label: "My Plans" },
@@ -16,11 +16,14 @@ export default function Header() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
   return (
-    <header className="border-b border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0">
+    <header className="relative border-b border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0">
       <div className="mx-auto max-w-[1280px] px-6 h-[60px] flex items-center gap-5">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-2.5 no-underline">
@@ -32,10 +35,10 @@ export default function Header() {
         </Link>
 
         {/* Divider */}
-        <span className="w-px h-[18px] bg-zinc-200 dark:bg-slate-800 shrink-0" />
+        <span className="hidden md:block w-px h-[18px] bg-zinc-200 dark:bg-slate-800 shrink-0" />
 
         {/* Nav */}
-        <nav className="flex items-center gap-0.5">
+        <nav className="hidden md:flex items-center gap-0.5">
           {navLinks.map(({ href, label }) => {
             const active = pathname === href;
             return (
@@ -75,11 +78,21 @@ export default function Header() {
         {/* + New plan */}
         <Link
           href="/encounters"
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-[13px] font-semibold hover:opacity-90 transition-opacity no-underline"
+          className="hidden md:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-[13px] font-semibold hover:opacity-90 transition-opacity no-underline"
         >
           <Plus size={14} />
           New plan
         </Link>
+
+        {/* Hamburger (mobile only) */}
+        <button
+          type="button"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          onClick={() => setMenuOpen((o) => !o)}
+          className="md:hidden w-8 h-8 rounded-lg border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-zinc-500 dark:text-slate-400 inline-flex items-center justify-center hover:bg-zinc-50 dark:hover:bg-slate-800 transition-colors"
+        >
+          {menuOpen ? <X size={16} /> : <Menu size={16} />}
+        </button>
 
         {/* Theme toggle */}
         {mounted && (
@@ -92,6 +105,39 @@ export default function Header() {
           </button>
         )}
       </div>
+
+      {/* Mobile menu panel */}
+      {menuOpen && (
+        <div className="md:hidden absolute top-[60px] left-0 right-0 z-50 border-b border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 flex flex-col gap-0.5">
+          {navLinks.map(({ href, label }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMenuOpen(false)}
+                className={`px-3 py-2 rounded-md text-[14px] transition-colors ${
+                  active
+                    ? "bg-zinc-100 dark:bg-slate-800 text-zinc-900 dark:text-slate-100 font-medium"
+                    : "text-zinc-500 dark:text-slate-400 hover:text-zinc-900 dark:hover:text-slate-100"
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+          <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-slate-800">
+            <Link
+              href="/encounters"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-[13.5px] font-semibold hover:opacity-90 transition-opacity no-underline"
+            >
+              <Plus size={14} />
+              New plan
+            </Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
