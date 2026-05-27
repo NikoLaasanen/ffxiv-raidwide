@@ -82,10 +82,8 @@ export async function GET(request: Request): Promise<Response> {
 
     if (!res.ok) {
       const text = await res.text();
-      return Response.json(
-        { error: `XIVAPI returned ${res.status}`, details: text.slice(0, 500) },
-        { status: 502 }
-      );
+      console.error(`[xivapi/actions] XIVAPI returned ${res.status}:`, text.slice(0, 500));
+      return Response.json({ error: "XIVAPI request failed" }, { status: 502 });
     }
 
     const data = (await res.json()) as V2SearchResponse;

@@ -82,7 +82,12 @@ export async function fetchAllEvents(
       dataType,
     });
     const page = data.reportData.report.events;
-    const rawData = typeof page.data === "string" ? JSON.parse(page.data) : page.data;
+    let rawData: unknown;
+    try {
+      rawData = typeof page.data === "string" ? JSON.parse(page.data) : page.data;
+    } catch {
+      throw new Error("Failed to parse FFLogs event data");
+    }
     events.push(...(rawData as FFLogsRawEvent[]));
     if (page.nextPageTimestamp === null || page.nextPageTimestamp === undefined) break;
     startTime = page.nextPageTimestamp;

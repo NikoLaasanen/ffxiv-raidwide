@@ -218,6 +218,9 @@ export async function POST(request: Request): Promise<Response> {
   if (typeof reportCode !== "string" || !reportCode) {
     return Response.json({ error: "reportCode must be a non-empty string" }, { status: 400 });
   }
+  if (!/^[a-zA-Z0-9]{8,32}$/.test(reportCode)) {
+    return Response.json({ error: "Invalid reportCode format" }, { status: 400 });
+  }
   if (!Number.isInteger(fightId) || ((fightId as number) < 1 && fightId !== -1)) {
     return Response.json({ error: "fightId must be a positive integer" }, { status: 400 });
   }

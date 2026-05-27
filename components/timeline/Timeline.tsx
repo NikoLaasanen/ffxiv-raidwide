@@ -1538,7 +1538,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           />
         )}
 
-        {!readOnly && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 p-4">
+        {!readOnly && timelineViewMode !== "my" && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 p-4">
           {/* Active roster strip — Option A */}
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-slate-400">

@@ -280,7 +280,7 @@ export function MyTimeline({
                           isCurrentRow && "bg-teal-50 dark:bg-teal-950/40 ring-1 ring-inset ring-teal-300 dark:ring-teal-700"
                         )}
                       >
-                        <span className="font-mono text-sm font-bold text-zinc-700 dark:text-slate-200 leading-tight shrink-0">
+                        <span className="font-mono text-sm font-bold text-zinc-500 dark:text-slate-400 leading-tight shrink-0">
                           {formatTimestamp(row.timestamp)}
                         </span>
                         {abilityEntries.map(({ job, abilityId }, i) => {
