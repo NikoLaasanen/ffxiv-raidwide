@@ -6,6 +6,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Sun, Moon, Plus, Menu, X, Search } from "lucide-react";
 import CommandPalette from "@/components/search/CommandPalette";
+import NewPlanDialog from "@/components/plan/NewPlanDialog";
 
 const navLinks = [
   { href: "/my-plans", label: "My Plans" },
@@ -19,6 +20,7 @@ export default function Header() {
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [newPlanOpen, setNewPlanOpen] = useState(false);
 
   // next-themes hydration guard: render output can't know the client theme
   // until after mount, so the synchronous set here is intentional.
@@ -94,13 +96,14 @@ export default function Header() {
         </button>
 
         {/* + New plan */}
-        <Link
-          href="/encounters"
-          className="hidden md:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-[13px] font-semibold hover:opacity-90 transition-opacity no-underline"
+        <button
+          type="button"
+          onClick={() => setNewPlanOpen(true)}
+          className="hidden md:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-[13px] font-semibold hover:opacity-90 transition-opacity cursor-pointer"
         >
           <Plus size={14} />
           New plan
-        </Link>
+        </button>
 
         {/* Hamburger (mobile only) */}
         <button
@@ -153,19 +156,20 @@ export default function Header() {
             );
           })}
           <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-slate-800">
-            <Link
-              href="/encounters"
-              onClick={() => setMenuOpen(false)}
-              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-[13.5px] font-semibold hover:opacity-90 transition-opacity no-underline"
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); setNewPlanOpen(true); }}
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-[13.5px] font-semibold hover:opacity-90 transition-opacity cursor-pointer"
             >
               <Plus size={14} />
               New plan
-            </Link>
+            </button>
           </div>
         </div>
       )}
 
       <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
+      <NewPlanDialog open={newPlanOpen} onOpenChange={setNewPlanOpen} />
     </header>
   );
 }
