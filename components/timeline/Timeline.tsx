@@ -654,11 +654,21 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   );
   const [selectedJobs, setSelectedJobs] = useState<JobAbbreviation[]>(() => allJobs);
   const [myPlanEditJobs, setMyPlanEditJobs] = useState<JobAbbreviation[]>(() => allJobs);
+  // Keep the My-plan selector in sync with the roster without clobbering the
+  // user's deselections. Reacts to the actual job set, not to reference churn
+  // from remote collaboration snapshots (which re-create `allJobs` each tick).
+  // New players default to visible; removed players are pruned; jobs the user
+  // intentionally deselected stay deselected.
+  const prevAllJobsRef = useRef<JobAbbreviation[]>(allJobs);
   useEffect(() => {
+    const prevSet = new Set(prevAllJobsRef.current);
+    const allSet = new Set(allJobs);
+    const added = allJobs.filter((j) => !prevSet.has(j));
+    prevAllJobsRef.current = allJobs;
     setMyPlanEditJobs((prev) => {
-      const existing = new Set(prev);
-      const missing = allJobs.filter((j) => !existing.has(j));
-      return missing.length ? [...prev, ...missing] : prev;
+      const pruned = prev.filter((j) => allSet.has(j));
+      const next = [...pruned, ...added];
+      return next.length === prev.length && pruned.length === prev.length ? prev : next;
     });
   }, [allJobs]);
   const [myPlanViewJobs, setMyPlanViewJobs] = useState<JobAbbreviation[]>(() => {
