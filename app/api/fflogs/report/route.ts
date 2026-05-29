@@ -207,7 +207,7 @@ function normalizeTimeline(
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   return timeline.map(({ _targetIds, ...rest }) => rest);
 }
 

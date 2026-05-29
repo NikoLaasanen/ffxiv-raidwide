@@ -619,11 +619,9 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     abilityTargetFilter,
     abilityTypeFilter,
     timelineViewMode,
-    myTimelinePlayerJob,
     myPlanDefaultJob,
     myPlanCompactView,
     setTimelineViewMode,
-    setMyTimelinePlayerJob,
   } = usePreferencesStore(
     useShallow((s) => ({
       showAutoAttacks: s.showAutoAttacks,
@@ -635,11 +633,9 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       abilityTargetFilter: s.abilityTargetFilter,
       abilityTypeFilter: s.abilityTypeFilter,
       timelineViewMode: s.timelineViewMode,
-      myTimelinePlayerJob: s.myTimelinePlayerJob,
       myPlanDefaultJob: s.myPlanDefaultJob,
       myPlanCompactView: s.myPlanCompactView,
       setTimelineViewMode: s.setTimelineViewMode,
-      setMyTimelinePlayerJob: s.setMyTimelinePlayerJob,
     }))
   );
 

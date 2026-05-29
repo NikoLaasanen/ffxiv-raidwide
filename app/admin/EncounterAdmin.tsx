@@ -652,7 +652,6 @@ export default function EncounterAdmin() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetch("/api/admin/encounters")
       .then((r) => r.json())
       .then((data) => { if (!cancelled && data.encounters) setEncounters(data.encounters); })
@@ -663,7 +662,7 @@ export default function EncounterAdmin() {
 
   const handleNew = () => { setEditing(null); setView("editor"); };
   const handleEdit = (enc: EncounterDoc) => { setEditing(enc); setView("editor"); };
-  const reloadEncounters = () => setReloadKey((k) => k + 1);
+  const reloadEncounters = () => { setLoading(true); setReloadKey((k) => k + 1); };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this encounter?")) return;

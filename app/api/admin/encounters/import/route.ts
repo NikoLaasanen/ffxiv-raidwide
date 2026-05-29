@@ -71,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
       lastRow.mechanicType = "enrage";
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const timeline = baseTimeline.map(({ _targetIds, damageEvent, ...rest }) => ({
       ...rest,
       playerMistakes: {},

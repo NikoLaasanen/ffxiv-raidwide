@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useEffect, useState, Fragment } from "react";
-import type { TimelineRow, MitigationAssignment, MechanicType } from "@/types/timeline";
-import type { DamageType } from "@/types/common";
+import type { TimelineRow, MitigationAssignment } from "@/types/timeline";
 import type { Player, PhaseDivider } from "@/types/player";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
@@ -62,11 +61,6 @@ export function MyTimeline({
   const selectedPlayers = useMemo(
     () => players.filter((p) => sortedSelectedJobs.includes(p.job)),
     [players, sortedSelectedJobs]
-  );
-
-  const playerByJob = useMemo(
-    () => new Map(selectedPlayers.map((p) => [p.job, p])),
-    [selectedPlayers]
   );
 
   // Merged ability list, deduped by id, in role order

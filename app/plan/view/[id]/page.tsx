@@ -47,8 +47,12 @@ export default function PlanViewPage({
     if (!hasHydrated) return;
     if (storePlan?.viewLinkId === id) return;
 
+    // Fetch is conditional (skipped when already in the store), so the loading
+    // flag is set synchronously here rather than initialized at mount.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setNotFound(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
     getPlanByViewLink(id)
       .then((plan) => {
         if (!plan) {
