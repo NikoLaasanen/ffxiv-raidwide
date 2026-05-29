@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, mem
 import type { TimelineRow, MitigationAssignment, MechanicType, PlayerMistakeState } from "@/types/timeline";
 import type { DamageType } from "@/types/common";
 import type { Player, PhaseDivider } from "@/types/player";
-import { ChevronDown, ChevronRight, Play, Pause, RotateCcw, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, Play, Pause, RotateCcw, ExternalLink, Undo2, Redo2 } from "lucide-react";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { PlayerCastEvent } from "@/types/fflogs";
@@ -24,7 +24,6 @@ import { usePreferencesStore } from "@/store/preferences-store";
 import { useShallow } from "zustand/react/shallow";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
-import { FavoriteButton } from "@/components/plan/FavoriteButton";
 import { CompareDialog } from "@/components/plan/CompareDialog";
 import { usePlanStore } from "@/store/plan-store";
 import { MyTimeline } from "@/components/timeline/MyTimeline";
@@ -33,6 +32,7 @@ import { ComparisonSummary, type DiffRow } from "@/components/timeline/Compariso
 import { MistakeSummary, type MistakeRow } from "@/components/timeline/MistakeSummary";
 import { RowPeerChips } from "@/components/timeline/PresenceAvatars";
 import type { Peer } from "@/lib/collab/presence";
+import { useAssignmentHistory, type AssignmentOp } from "@/hooks/use-assignment-history";
 
 interface TimelineProps {
   timeline: TimelineRow[];
@@ -48,7 +48,6 @@ interface TimelineProps {
   readOnly?: boolean;
   viewLinkId?: string;
   title?: string;
-  encounterId?: string | null;
   encounterTier?: string | null;
   raidplanLink?: string;
   headerLeft?: React.ReactNode;
@@ -629,7 +628,7 @@ function samePlayers(a: Player[], b: Player[]): boolean {
   return b.every((p) => set.has(key(p)));
 }
 
-export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, syncedAssignments, onAssignmentsChange, onPhasesChange, onPlayersChange, readOnly, viewLinkId, title, encounterId, encounterTier, raidplanLink, headerLeft, peers = EMPTY_PEERS, onHover }: TimelineProps) {
+export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, syncedAssignments, onAssignmentsChange, onPhasesChange, onPlayersChange, readOnly, viewLinkId, title, encounterTier, raidplanLink, headerLeft, peers = EMPTY_PEERS, onHover }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -733,6 +732,8 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     if (!syncedAssignments) return;
     setAssignments((prev) => (sameAssignments(prev, syncedAssignments) ? prev : syncedAssignments));
   }, [syncedAssignments]);
+  // Undo/redo history for local assignment toggles only (see hook docs).
+  const { record: recordHistory, undo: undoHistory, redo: redoHistory, reset: resetHistory, canUndo, canRedo } = useAssignmentHistory();
   const [localTimeline, setLocalTimeline] = useState<TimelineRow[]>(timeline);
   useEffect(() => { setLocalTimeline(timeline); }, [timeline]);
 
@@ -939,8 +940,9 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     if (prevViewLinkIdRef.current !== viewLinkId) {
       prevViewLinkIdRef.current = viewLinkId;
       setComparison(null, null);
+      resetHistory();
     }
-  }, [viewLinkId, setComparison]);
+  }, [viewLinkId, setComparison, resetHistory]);
 
   const assignedSet = useMemo(
     () => new Set(assignments.map((a) => `${a.playerId}|${a.abilityId}|${a.timestamp}`)),
@@ -1078,6 +1080,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     if (!player) return;
     const exists = assignedSet.has(`${player.id}|${abilityId}|${timestamp}`);
     if (!exists && isOnCooldown(timestamp, job, abilityId)) return;
+    recordHistory({ kind: exists ? "remove" : "add", assignment: { timestamp, playerId: player.id, abilityId } });
     setAssignments((prev) =>
       exists
         ? prev.filter(
@@ -1086,6 +1089,51 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
         : [...prev, { timestamp, playerId: player.id, abilityId }]
     );
   }
+
+  // Apply a history op against the current assignments (not a snapshot), so undo/redo
+  // touches only the single toggled cell and never clobbers a collaborator's edit.
+  // Cooldown isn't re-checked — undo/redo restores prior intent and adds dedupe by key.
+  const applyAssignmentOp = useCallback((op: AssignmentOp, direction: "undo" | "redo") => {
+    const shouldAdd = direction === "undo" ? op.kind === "remove" : op.kind === "add";
+    const { assignment } = op;
+    const key = `${assignment.playerId}|${assignment.abilityId}|${assignment.timestamp}`;
+    setAssignments((prev) => {
+      const has = prev.some((a) => `${a.playerId}|${a.abilityId}|${a.timestamp}` === key);
+      if (shouldAdd) return has ? prev : [...prev, assignment];
+      return has ? prev.filter((a) => `${a.playerId}|${a.abilityId}|${a.timestamp}` !== key) : prev;
+    });
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const op = undoHistory();
+    if (op) applyAssignmentOp(op, "undo");
+  }, [undoHistory, applyAssignmentOp]);
+
+  const handleRedo = useCallback(() => {
+    const op = redoHistory();
+    if (op) applyAssignmentOp(op, "redo");
+  }, [redoHistory, applyAssignmentOp]);
+
+  // Keyboard shortcuts: Ctrl/Cmd+Z (undo), Ctrl/Cmd+Shift+Z or Ctrl+Y (redo).
+  // Edit mode + full view only; ignored while typing in an input/textarea.
+  useEffect(() => {
+    if (readOnly || timelineViewMode === "my") return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [readOnly, timelineViewMode, handleUndo, handleRedo]);
 
   const visibleRows = useMemo(
     () =>
@@ -1328,6 +1376,30 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               </div>
             )}
             <div className="flex items-center gap-1.5 md:gap-2">
+              {!readOnly && timelineViewMode === "full" && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    aria-label="Undo"
+                    title="Undo (Ctrl+Z)"
+                  >
+                    <Undo2 size={16} />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={handleRedo}
+                    disabled={!canRedo}
+                    aria-label="Redo"
+                    title="Redo (Ctrl+Shift+Z)"
+                  >
+                    <Redo2 size={16} />
+                  </Button>
+                </div>
+              )}
               {raidplanLink && (
                 <Button variant="outline" size="icon-sm" asChild aria-label="View on FFLogs">
                   <a href={raidplanLink} target="_blank" rel="noopener noreferrer">
@@ -1346,9 +1418,6 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                   title={title ?? ""}
                   encounterTier={encounterTier}
                 />
-              )}
-              {viewLinkId && title !== undefined && (
-                <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
               )}
               {readOnly && viewLinkId && (
                 <CompareDialog

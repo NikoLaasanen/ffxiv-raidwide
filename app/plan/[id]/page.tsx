@@ -4,6 +4,7 @@ import { use, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
 import { Timeline } from "@/components/timeline/Timeline";
+import { FavoriteButton } from "@/components/plan/FavoriteButton";
 import { getVisibleRows } from "@/lib/timeline-utils";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Check, RefreshCw } from "lucide-react";
@@ -111,14 +112,21 @@ export default function PlanPage({
             )}
             {storePlan.encounterTier && <span>{storePlan.encounterTier}</span>}
           </div>
-          {storePlan.raidplanLink && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={storePlan.raidplanLink} target="_blank" rel="noopener noreferrer" aria-label="View on FFLogs" className="gap-1.5">
-                <ExternalLink size={16} />
-                <span className="hidden md:inline">View on FFLogs</span>
-              </a>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {storePlan.raidplanLink && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={storePlan.raidplanLink} target="_blank" rel="noopener noreferrer" aria-label="View on FFLogs" className="gap-1.5">
+                  <ExternalLink size={16} />
+                  <span className="hidden md:inline">View on FFLogs</span>
+                </a>
+              </Button>
+            )}
+            <FavoriteButton
+              viewLinkId={storePlan.viewLinkId}
+              title={storePlan.title}
+              encounterId={storePlan.encounterId}
+            />
+          </div>
         </div>
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-bold">{storePlan.title}</h1>
@@ -139,7 +147,6 @@ export default function PlanPage({
         onPlayersChange={handlePlayersChange}
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
-        encounterId={storePlan.encounterId}
         encounterTier={storePlan.encounterTier}
         peers={peers}
         onHover={updateCursor}

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
 import { getPlanByViewLink, buildPlanCopy } from "@/lib/plan-service";
 import { Timeline } from "@/components/timeline/Timeline";
+import { FavoriteButton } from "@/components/plan/FavoriteButton";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink } from "lucide-react";
 import { formatTimestamp } from "@/lib/format-timestamp";
@@ -118,6 +119,11 @@ export default function PlanViewPage({
               <Copy size={16} />
               <span className="hidden md:inline">Make a copy</span>
             </Button>
+            <FavoriteButton
+              viewLinkId={storePlan.viewLinkId}
+              title={storePlan.title}
+              encounterId={storePlan.encounterId}
+            />
           </div>
         </div>
         <h1 className="text-2xl font-bold">{storePlan.title}</h1>
@@ -130,7 +136,6 @@ export default function PlanViewPage({
         readOnly
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
-        encounterId={storePlan.encounterId}
         encounterTier={storePlan.encounterTier}
         headerLeft={
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
