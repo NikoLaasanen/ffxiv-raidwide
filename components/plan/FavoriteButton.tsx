@@ -4,8 +4,8 @@ import { useSyncExternalStore } from "react";
 import { Heart } from "lucide-react";
 import {
   getFavorites,
+  getFavoritesServerSnapshot,
   subscribeToFavorites,
-  isFavorite,
   addFavorite,
   removeFavorite,
 } from "@/lib/favorites-storage";
@@ -18,9 +18,13 @@ interface FavoriteButtonProps {
 }
 
 export function FavoriteButton({ viewLinkId, title, encounterId }: FavoriteButtonProps) {
-  useSyncExternalStore(subscribeToFavorites, getFavorites, getFavorites);
+  const favorites = useSyncExternalStore(
+    subscribeToFavorites,
+    getFavorites,
+    getFavoritesServerSnapshot
+  );
 
-  const favorited = isFavorite(viewLinkId);
+  const favorited = favorites.some((f) => f.viewLinkId === viewLinkId);
 
   function toggle() {
     if (favorited) {

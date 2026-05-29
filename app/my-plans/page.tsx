@@ -5,11 +5,13 @@ import Link from "next/link";
 import { Heart } from "lucide-react";
 import {
   getMyPlans,
+  getMyPlansServerSnapshot,
   removeMyPlan,
   subscribeToMyPlans,
 } from "@/lib/my-plans-storage";
 import {
   getFavorites,
+  getFavoritesServerSnapshot,
   removeFavorite,
   subscribeToFavorites,
 } from "@/lib/favorites-storage";
@@ -26,13 +28,13 @@ export default function MyPlansPage() {
   const plans = useSyncExternalStore(
     subscribeToMyPlans,
     getMyPlans,
-    getMyPlans
+    getMyPlansServerSnapshot
   );
 
   const favorites = useSyncExternalStore(
     subscribeToFavorites,
     getFavorites,
-    getFavorites
+    getFavoritesServerSnapshot
   );
 
   return (

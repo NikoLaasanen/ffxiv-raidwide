@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Plans. Access is by knowledge of the document id (editLinkId) or the
+    // viewLinkId — matching the app's existing link-based trust model. The
+    // server (/api/plans) uses the Admin SDK and bypasses these rules.
+    match /plans/{planId} {
+      allow read: if true;            // get + list (getPlanByViewLink query)
+      allow create, update: if true;  // client-direct collaborative edits
+      allow delete: if false;
+    }
+
+    // Reference data is written only by the admin panel via the Admin SDK
+    // (which bypasses rules); clients read it.
+    match /job_abilities/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /encounters/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

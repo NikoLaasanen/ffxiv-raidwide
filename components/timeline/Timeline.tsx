@@ -28,6 +28,8 @@ import { FavoriteButton } from "@/components/plan/FavoriteButton";
 import { CompareDialog } from "@/components/plan/CompareDialog";
 import { usePlanStore } from "@/store/plan-store";
 import { MyTimeline } from "@/components/timeline/MyTimeline";
+import { RowPeerChips } from "@/components/timeline/PresenceAvatars";
+import type { Peer } from "@/lib/collab/presence";
 
 interface TimelineProps {
   timeline: TimelineRow[];
@@ -35,6 +37,8 @@ interface TimelineProps {
   casts?: PlayerCastEvent[];
   phases?: PhaseDivider[];
   initialAssignments?: MitigationAssignment[];
+  /** Authoritative assignments pushed from a remote collaborator (edit views). */
+  syncedAssignments?: MitigationAssignment[];
   onAssignmentsChange?: (a: MitigationAssignment[]) => void;
   onPhasesChange?: (phases: PhaseDivider[]) => void;
   onPlayersChange?: (players: Player[]) => void;
@@ -44,6 +48,10 @@ interface TimelineProps {
   encounterId?: string | null;
   raidplanLink?: string;
   headerLeft?: React.ReactNode;
+  /** Live collaborators present on this plan. */
+  peers?: Peer[];
+  /** Report the cell the local user is hovering, for presence cursors. */
+  onHover?: (timestamp: number | null, job: JobAbbreviation | null) => void;
 }
 
 type CellState = {
@@ -241,15 +249,19 @@ interface RowProps {
   onAddPhase: (ts: number) => void;
   readOnly?: boolean;
   isComparing: boolean;
+  rowPeers: Peer[];
+  onHover?: (timestamp: number | null, job: JobAbbreviation | null) => void;
 }
 
 const TimelineBodyRow = memo(
-  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle, onAddPhase, readOnly, isComparing }: RowProps) {
+  function TimelineBodyRow({ row, index, players, selectedJobs, abilitiesByJob, cellStates, mitigation, playerByJob, showDamageColumn, showSourceColumn, showMechanicTypeColumn, showMistakesColumn, playerStatusRanges, onToggle, onCycle, onAddPhase, readOnly, isComparing, rowPeers, onHover }: RowProps) {
     let cellIndex = 0;
 
     const deathPlayers = players.filter((p) => row.playerMistakes[p.id]?.dead);
     const ddPlayers = players.filter((p) => row.playerMistakes[p.id]?.damageDownTimestamp != null);
     const hasMistakeSummary = deathPlayers.length > 0 || ddPlayers.length > 0;
+    const peerColor = rowPeers[0]?.color;
+    const peerJobs = new Set(rowPeers.map((p) => p.hoverJob).filter(Boolean) as JobAbbreviation[]);
 
     return (
       <tr
@@ -257,9 +269,11 @@ const TimelineBodyRow = memo(
           "group/row transition-colors hover:bg-teal-50/60 dark:hover:bg-teal-950/20",
           index % 2 === 0 ? "bg-white dark:bg-slate-950" : "bg-zinc-50/50 dark:bg-slate-900/50"
         )}
+        style={peerColor ? { boxShadow: `inset 3px 0 0 0 ${peerColor}` } : undefined}
       >
         <td className="px-4 py-2 font-mono text-xs text-zinc-500 dark:text-slate-400 relative">
           {formatTimestamp(row.timestamp)}
+          <RowPeerChips peers={rowPeers} />
           {!readOnly && (
             <button
               onClick={() => onAddPhase(row.timestamp)}
@@ -442,6 +456,8 @@ const TimelineBodyRow = memo(
           const abilities = abilitiesByJob[job] ?? [];
           const player = playerByJob.get(job);
           const showMistakes = showMistakesColumn && (player?.mistakeColumnsEnabled ?? false);
+          // Peer (if any) whose cursor is on this job's column in this row.
+          const jobPeer = peerJobs.has(job) ? rowPeers.find((p) => p.hoverJob === job) : undefined;
           const mistakeCell = showMistakes && player ? (() => {
             const ms = row.playerMistakes[player.id];
             const mistakeBg = getMistakeBg(row.timestamp, ms, playerStatusRanges.get(player.id));
@@ -473,6 +489,7 @@ const TimelineBodyRow = memo(
             const btn = (
               <button
                 onClick={readOnly ? undefined : () => onToggle(row.timestamp, job, ab.id)}
+                onMouseEnter={onHover ? () => onHover(row.timestamp, job) : undefined}
                 disabled={readOnly}
                 className={cn(
                   "w-5 h-5 rounded mx-auto block transition-colors",
@@ -513,9 +530,19 @@ const TimelineBodyRow = memo(
                 className={cn(
                   "py-2 w-8 text-center",
                   i === 0 && !showMistakes && "border-l border-zinc-100 dark:border-slate-800",
-                  inDuration && "bg-teal-50 dark:bg-teal-950/30"
+                  inDuration && "bg-teal-50 dark:bg-teal-950/30",
+                  jobPeer && "relative"
                 )}
+                style={jobPeer ? { backgroundColor: `${jobPeer.color}22` } : undefined}
               >
+                {jobPeer && i === abilities.length - 1 && (
+                  <span
+                    className="pointer-events-none absolute top-0.5 right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-950"
+                    style={{ backgroundColor: jobPeer.color }}
+                    title={`${jobPeer.name} is here`}
+                    aria-hidden
+                  />
+                )}
                 {onCooldown ? (
                   <Tooltip>
                     <TooltipTrigger asChild>{cellContent}</TooltipTrigger>
@@ -546,8 +573,16 @@ const TimelineBodyRow = memo(
     prev.onToggle === next.onToggle &&
     prev.onCycle === next.onCycle &&
     prev.onAddPhase === next.onAddPhase &&
+    prev.onHover === next.onHover &&
     prev.readOnly === next.readOnly &&
     prev.isComparing === next.isComparing &&
+    prev.rowPeers.length === next.rowPeers.length &&
+    prev.rowPeers.every(
+      (p, i) =>
+        p.sessionId === next.rowPeers[i].sessionId &&
+        p.color === next.rowPeers[i].color &&
+        p.hoverJob === next.rowPeers[i].hoverJob
+    ) &&
     prev.mitigation.totalMitPercent === next.mitigation.totalMitPercent &&
     prev.mitigation.mitigatedDamage === next.mitigation.mitigatedDamage &&
     prev.cellStates.length === next.cellStates.length &&
@@ -562,8 +597,18 @@ const TimelineBodyRow = memo(
 );
 
 const EMPTY_PHASES: PhaseDivider[] = [];
+const EMPTY_PEERS: Peer[] = [];
+const EMPTY_ROW_PEERS: Peer[] = [];
 
-export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, onAssignmentsChange, onPhasesChange, onPlayersChange, readOnly, viewLinkId, title, encounterId, raidplanLink, headerLeft }: TimelineProps) {
+/** Order-independent equality for assignment sets (identity = player|ability|ts). */
+function sameAssignments(a: MitigationAssignment[], b: MitigationAssignment[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (x: MitigationAssignment) => `${x.playerId}|${x.abilityId}|${x.timestamp}`;
+  const set = new Set(a.map(key));
+  return b.every((x) => set.has(key(x)));
+}
+
+export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, syncedAssignments, onAssignmentsChange, onPhasesChange, onPlayersChange, readOnly, viewLinkId, title, encounterId, raidplanLink, headerLeft, peers = EMPTY_PEERS, onHover }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -632,6 +677,13 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   const onAssignmentsChangeRef = useRef(onAssignmentsChange);
   useLayoutEffect(() => { onAssignmentsChangeRef.current = onAssignmentsChange; });
   useEffect(() => { onAssignmentsChangeRef.current?.(assignments); }, [assignments]);
+  // Apply assignments pushed from remote collaborators. Only replaces local
+  // state when the synced set actually differs, so it doesn't clobber an
+  // in-flight local edit echoing back through Firestore.
+  useEffect(() => {
+    if (!syncedAssignments) return;
+    setAssignments((prev) => (sameAssignments(prev, syncedAssignments) ? prev : syncedAssignments));
+  }, [syncedAssignments]);
   const [localTimeline, setLocalTimeline] = useState<TimelineRow[]>(timeline);
   useEffect(() => { setLocalTimeline(timeline); }, [timeline]);
 
@@ -1067,6 +1119,26 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   const addPhaseRef = useRef(addPhase);
   const stableAddPhase = useCallback((ts: number) => addPhaseRef.current(ts), []);
 
+  const hoverRef = useRef(onHover);
+  useLayoutEffect(() => { hoverRef.current = onHover; });
+  const stableHover = useCallback(
+    (ts: number | null, job: JobAbbreviation | null) => hoverRef.current?.(ts, job),
+    []
+  );
+
+  // Group peers by the row they're hovering, so each row only re-renders when
+  // its own peers change (keeps virtualization cheap).
+  const peersByTimestamp = useMemo(() => {
+    const map = new Map<number, Peer[]>();
+    for (const p of peers) {
+      if (p.hoverTimestamp == null) continue;
+      const list = map.get(p.hoverTimestamp);
+      if (list) list.push(p);
+      else map.set(p.hoverTimestamp, [p]);
+    }
+    return map;
+  }, [peers]);
+
   useLayoutEffect(() => {
     cycleRef.current = cycleDamageType;
     toggleRef.current = toggleAssignment;
@@ -1359,7 +1431,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
         )}
 
         {timelineViewMode === "full" && (
-        <div ref={scrollContainerRef} className="relative overflow-auto min-h-48 max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
+        <div ref={scrollContainerRef} onMouseLeave={onHover ? () => stableHover(null, null) : undefined} className="relative overflow-auto min-h-48 max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
           {isLoading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-950/70 backdrop-blur-[2px]">
               <div className="flex flex-col items-center gap-2 text-sm text-zinc-500 dark:text-slate-400">
@@ -1515,6 +1587,8 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                     onAddPhase={stableAddPhase}
                     readOnly={readOnly}
                     isComparing={isComparing}
+                    rowPeers={peersByTimestamp.get(item.row.timestamp) ?? EMPTY_ROW_PEERS}
+                    onHover={stableHover}
                   />
                 );
               })}

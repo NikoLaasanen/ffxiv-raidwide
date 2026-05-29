@@ -53,6 +53,26 @@ export async function updatePlan(plan: Plan): Promise<void> {
   }
 }
 
+/**
+ * Build an independent, unsaved copy of a plan with fresh link IDs.
+ * Deep-clones all nested data so editing the copy can never mutate the
+ * original. The caller decides whether to persist it (via `savePlan`).
+ */
+export function buildPlanCopy(original: Plan): Plan {
+  const editLinkId = crypto.randomUUID();
+  const viewLinkId = crypto.randomUUID();
+  const now = Date.now();
+  return {
+    ...structuredClone(original),
+    id: editLinkId,
+    editLinkId,
+    viewLinkId,
+    title: `${original.title} (Copy)`,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 export async function getPlan(id: string): Promise<Plan | null> {
   const ref = doc(db, COLLECTIONS.PLANS, id);
   const snap = await getDoc(ref);

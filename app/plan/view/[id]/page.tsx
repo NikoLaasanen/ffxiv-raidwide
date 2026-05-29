@@ -7,11 +7,12 @@ const TYPE_BADGE: Record<string, string> = {
 };
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
-import { getPlanByViewLink } from "@/lib/plan-service";
+import { getPlanByViewLink, buildPlanCopy } from "@/lib/plan-service";
 import { Timeline } from "@/components/timeline/Timeline";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { Copy, ExternalLink } from "lucide-react";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { getVisibleRows } from "@/lib/timeline-utils";
 
@@ -21,13 +22,23 @@ export default function PlanViewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
 
   const storePlan = usePlanStore((s) => s.plan);
   const hasHydrated = usePlanStore((s) => s._hasHydrated);
   const setPlan = usePlanStore((s) => s.setPlan);
+  const setDraftPlan = usePlanStore((s) => s.setDraftPlan);
 
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
+
+  function handleCopy() {
+    if (!storePlan) return;
+    // Stage an unsaved copy; the draft page lets the user edit and decide
+    // whether to persist it. The original is never written to.
+    setDraftPlan(buildPlanCopy(storePlan));
+    router.push("/plan/draft");
+  }
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -87,14 +98,20 @@ export default function PlanViewPage({
             )}
             {storePlan.encounterTier && <span>{storePlan.encounterTier}</span>}
           </div>
-          {storePlan.raidplanLink && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={storePlan.raidplanLink} target="_blank" rel="noopener noreferrer" aria-label="View on FFLogs" className="gap-1.5">
-                <ExternalLink size={16} />
-                <span className="hidden md:inline">View on FFLogs</span>
-              </a>
+          <div className="flex items-center gap-2">
+            {storePlan.raidplanLink && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={storePlan.raidplanLink} target="_blank" rel="noopener noreferrer" aria-label="View on FFLogs" className="gap-1.5">
+                  <ExternalLink size={16} />
+                  <span className="hidden md:inline">View on FFLogs</span>
+                </a>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleCopy} aria-label="Make a copy" className="cursor-pointer gap-1.5">
+              <Copy size={16} />
+              <span className="hidden md:inline">Make a copy</span>
             </Button>
-          )}
+          </div>
         </div>
         <h1 className="text-2xl font-bold">{storePlan.title}</h1>
       </div>

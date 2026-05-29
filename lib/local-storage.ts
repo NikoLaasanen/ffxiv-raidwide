@@ -1,5 +1,6 @@
 export interface LocalStorage<T> {
   get(): T[];
+  getServerSnapshot(): T[];
   subscribe(callback: () => void): () => void;
   upsert(item: T, key: (item: T) => string): void;
   remove(key: string, itemKey: (item: T) => string): void;
@@ -28,6 +29,13 @@ export function createLocalStorage<T>(storageKey: string, eventName: string, max
       } catch {
         return EMPTY;
       }
+    },
+
+    getServerSnapshot(): T[] {
+      // Stable reference used for SSR and the initial client hydration render so
+      // both produce identical HTML. Real data is picked up after hydration via
+      // get() once subscribed.
+      return EMPTY;
     },
 
     subscribe(callback: () => void): () => void {

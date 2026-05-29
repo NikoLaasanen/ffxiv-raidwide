@@ -7,6 +7,8 @@ import type { MitigationAssignment } from "@/types/timeline";
 interface PlanState {
   _hasHydrated: boolean;
   plan: Plan | null;
+  /** Unsaved plan copy awaiting explicit save on the draft preview page. */
+  draftPlan: Plan | null;
   pendingImport: FflogsImportResult | null;
   selectedTimestamp: number | null;
   mode: "edit" | "view";
@@ -19,6 +21,7 @@ interface PlanState {
 interface PlanActions {
   _setHasHydrated: (v: boolean) => void;
   setPlan: (plan: Plan) => void;
+  setDraftPlan: (plan: Plan | null) => void;
   setPendingImport: (data: FflogsImportResult | null) => void;
   updatePlan: (updater: (plan: Plan) => Plan) => void;
   undo: () => void;
@@ -33,6 +36,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
     (set, get) => ({
       _hasHydrated: false,
       plan: null,
+      draftPlan: null,
       pendingImport: null,
       selectedTimestamp: null,
       mode: "edit",
@@ -43,6 +47,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
 
       _setHasHydrated: (v) => set({ _hasHydrated: v }),
       setPlan: (plan) => set({ plan, past: [], future: [], comparisonAssignments: null, comparisonLabel: null }),
+      setDraftPlan: (plan) => set({ draftPlan: plan }),
       setPendingImport: (data) => set({ pendingImport: data }),
 
       updatePlan: (updater) => {
@@ -85,7 +90,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       name: "ffxiv-raidwide-plan",
       storage: createJSONStorage(() => localStorage),
       version: 1,
-      partialize: (state) => ({ pendingImport: state.pendingImport }),
+      partialize: (state) => ({ pendingImport: state.pendingImport, draftPlan: state.draftPlan }),
       onRehydrateStorage: () => (state) => {
         state?._setHasHydrated(true);
       },

@@ -1,14 +1,16 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePlanStore } from "@/store/plan-store";
-import { getPlan, updatePlan } from "@/lib/plan-service";
 import { Timeline } from "@/components/timeline/Timeline";
 import { getVisibleRows } from "@/lib/timeline-utils";
 import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Check, RefreshCw } from "lucide-react";
 import { formatTimestamp } from "@/lib/format-timestamp";
+import { useCollaboration } from "@/hooks/use-collaboration";
+import { PresenceStack, SelfBadge } from "@/components/timeline/PresenceAvatars";
+import { upsertMyPlan } from "@/lib/my-plans-storage";
 import type { Plan } from "@/types/plan";
 import type { MitigationAssignment } from "@/types/timeline";
 import type { PhaseDivider, Player } from "@/types/player";
@@ -31,53 +33,45 @@ export default function PlanPage({
   const setPlan = usePlanStore((s) => s.setPlan);
   const router = useRouter();
 
-  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [currentAssignments, setCurrentAssignments] = useState<MitigationAssignment[]>([]);
-  const handleAssignmentsChange = useCallback((a: MitigationAssignment[]) => setCurrentAssignments(a), []);
-  const [currentPhases, setCurrentPhases] = useState<PhaseDivider[]>([]);
-  const handlePhasesChange = useCallback((p: PhaseDivider[]) => setCurrentPhases(p), []);
-  const [currentPlayers, setCurrentPlayers] = useState<Player[]>([]);
-  const handlePlayersChange = useCallback((p: Player[]) => setCurrentPlayers(p), []);
+  // Assignments the server is known to hold, pushed down into Timeline so remote
+  // edits appear live.
+  const [syncedAssignments, setSyncedAssignments] = useState<MitigationAssignment[]>([]);
 
-  // Load plan from Firebase if the store doesn't already have it
-  useEffect(() => {
-    if (!hasHydrated) return;
-    if (storePlan?.editLinkId === id) return;
-
-    setLoading(true);
-    setNotFound(false);
-    getPlan(id)
-      .then((plan) => {
-        if (!plan) {
-          setNotFound(true);
-        } else {
-          setPlan(plan);
-        }
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-  }, [hasHydrated, id, storePlan?.editLinkId, setPlan]);
-
-  async function handleSave() {
-    if (!storePlan) return;
-    setSaving(true);
-    setSaved(false);
-    try {
-      const updated: Plan = { ...storePlan, updatedAt: Date.now(), assignments: currentAssignments, phases: currentPhases, players: currentPlayers };
-      await updatePlan(updated);
-      setPlan(updated);
-      setSaved(true);
-    } catch (err) {
-      console.error("Failed to save plan:", err);
-    } finally {
-      setSaving(false);
+  // Receive remote plan snapshots (initial load + live collaborator edits).
+  const onRemotePlan = useCallback((plan: Plan | null) => {
+    setLoaded(true);
+    if (!plan) {
+      setNotFound(true);
+      return;
     }
-  }
+    setNotFound(false);
+    setPlan(plan);
+    setSyncedAssignments(plan.assignments ?? []);
+    upsertMyPlan({
+      id: plan.id,
+      title: plan.title,
+      editLinkId: plan.editLinkId,
+      viewLinkId: plan.viewLinkId,
+      encounterId: plan.encounterId,
+      encounterType: plan.encounterType,
+      updatedAt: plan.updatedAt,
+      savedAt: Date.now(),
+    });
+  }, [setPlan]);
 
-  if (!hasHydrated || loading) {
+  const { peers, identity, saving, updateCursor, emitAssignments, emitPhases, emitPlayers } = useCollaboration({
+    editLinkId: id,
+    enabled: hasHydrated,
+    onRemotePlan,
+  });
+
+  const handleAssignmentsChange = useCallback((a: MitigationAssignment[]) => emitAssignments(a), [emitAssignments]);
+  const handlePhasesChange = useCallback((p: PhaseDivider[]) => emitPhases(p), [emitPhases]);
+  const handlePlayersChange = useCallback((p: Player[]) => emitPlayers(p), [emitPlayers]);
+
+  if (!hasHydrated || !loaded) {
     return (
       <main className="p-8">
         <div className="animate-pulse space-y-4">
@@ -126,19 +120,28 @@ export default function PlanPage({
             </Button>
           )}
         </div>
-        <h1 className="text-2xl font-bold">{storePlan.title}</h1>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">{storePlan.title}</h1>
+          <div className="flex items-center gap-2">
+            {peers.length > 0 && <SelfBadge identity={identity} />}
+            <PresenceStack peers={peers} />
+          </div>
+        </div>
       </div>
       <Timeline
         timeline={storePlan.timeline}
         players={storePlan.players}
         phases={storePlan.phases}
         initialAssignments={storePlan.assignments ?? []}
+        syncedAssignments={syncedAssignments}
         onAssignmentsChange={handleAssignmentsChange}
         onPhasesChange={handlePhasesChange}
         onPlayersChange={handlePlayersChange}
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}
+        peers={peers}
+        onHover={updateCursor}
         headerLeft={
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {storePlan.players.length} players · {visibleRows.length} timeline events · {duration}
@@ -147,15 +150,16 @@ export default function PlanPage({
       />
 
       <div className="mt-6 flex items-center gap-3">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Plan"}
-        </Button>
+        <span className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+          {saving ? (
+            <><RefreshCw size={14} className="animate-spin" /> Saving…</>
+          ) : (
+            <><Check size={14} className="text-green-500" /> All changes saved</>
+          )}
+        </span>
         <Button variant="outline" onClick={() => router.push(`/plan/view/${storePlan.viewLinkId}`)}>
           View
         </Button>
-        {saved && (
-          <span className="text-sm text-green-500">Saved</span>
-        )}
       </div>
     </main>
   );

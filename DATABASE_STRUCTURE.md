@@ -79,3 +79,30 @@ Role actions are stored once with a `jobs` array covering all applicable jobs.
 | `updatedAt` | `number` | Unix ms |
 
 **Querying by job:** `where("jobs", "array-contains", job)`
+
+---
+
+# Realtime Database (collaboration presence)
+
+Ephemeral live-cursor data for the plan editor lives in **Firebase Realtime Database**
+(not Firestore), because cursor updates are high-frequency and RTDB is billed by
+bandwidth with built-in `onDisconnect` cleanup. Edit views only.
+
+Requires env var `NEXT_PUBLIC_FIREBASE_DATABASE_URL`. Managed by `lib/collab/presence.ts`.
+
+## `presence/{editLinkId}/{sessionId}`
+
+One node per open editor tab. Auto-removed on disconnect; stale nodes (>30s) are
+ignored client-side.
+
+| Field | Type | Description |
+|---|---|---|
+| `sessionId` | `string` | Per-tab UUID (the node key) |
+| `name` | `string` | Anonymous display name (e.g. `"Anonymous Otter"`) |
+| `color` | `string` | Hex cursor color |
+| `hoverTimestamp` | `number \| null` | Timeline row the user is hovering |
+| `hoverJob` | `JobAbbreviation \| null` | Job column the user is hovering |
+| `updatedAt` | `number` | Unix ms (staleness / liveness) |
+
+Durable timeline edits still sync through Firestore `plans/{editLinkId}` via
+`onSnapshot` + granular `arrayUnion`/`arrayRemove` writes (`lib/collab/plan-sync.ts`).

@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useFflogsImport, parseFflogsUrl } from "@/hooks/use-fflogs-import";
 import { usePlanStore } from "@/store/plan-store";
-import { getMyPlans, subscribeToMyPlans } from "@/lib/my-plans-storage";
+import { getMyPlans, getMyPlansServerSnapshot, subscribeToMyPlans } from "@/lib/my-plans-storage";
 import type { MyPlanEntry } from "@/lib/my-plans-storage";
 import type { EncounterDoc, EncounterType } from "@/types/encounter";
 import type { FflogsImportResult } from "@/types/fflogs";
@@ -543,7 +543,7 @@ export default function HomeClient({
   const plans = useSyncExternalStore(
     subscribeToMyPlans,
     getMyPlans,
-    getMyPlans,
+    getMyPlansServerSnapshot,
   );
 
   useEffect(() => {

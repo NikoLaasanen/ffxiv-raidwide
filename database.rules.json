@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "presence": {
+      "$editLinkId": {
+        ".read": true,
+        ".write": true,
+        "$sessionId": {
+          ".validate": "newData.hasChildren(['sessionId', 'name', 'color', 'updatedAt'])"
+        }
+      }
+    }
+  }
+}

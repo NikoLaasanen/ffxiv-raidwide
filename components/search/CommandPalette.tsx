@@ -15,8 +15,8 @@ import {
 import { usePlanStore } from "@/store/plan-store";
 import { useEncounters } from "@/hooks/use-encounters";
 import { buildPlanFromEncounter } from "@/lib/create-plan-from-encounter";
-import { getMyPlans, subscribeToMyPlans } from "@/lib/my-plans-storage";
-import { getFavorites, subscribeToFavorites } from "@/lib/favorites-storage";
+import { getMyPlans, getMyPlansServerSnapshot, subscribeToMyPlans } from "@/lib/my-plans-storage";
+import { getFavorites, getFavoritesServerSnapshot, subscribeToFavorites } from "@/lib/favorites-storage";
 import type { EncounterDoc } from "@/types/encounter";
 
 const RECENT_LIMIT = 7;
@@ -34,11 +34,11 @@ export default function CommandPalette({
   const setPlan = usePlanStore((s) => s.setPlan);
   const [query, setQuery] = useState("");
 
-  const plans = useSyncExternalStore(subscribeToMyPlans, getMyPlans, getMyPlans);
+  const plans = useSyncExternalStore(subscribeToMyPlans, getMyPlans, getMyPlansServerSnapshot);
   const favorites = useSyncExternalStore(
     subscribeToFavorites,
     getFavorites,
-    getFavorites
+    getFavoritesServerSnapshot
   );
   const { data: encounters = [] } = useEncounters();
 

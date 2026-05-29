@@ -15,6 +15,7 @@ export interface MyPlanEntry {
 const store = createLocalStorage<MyPlanEntry>("ffxiv-raidwide-my-plans", "ffxiv-my-plans-updated", 50);
 
 export const getMyPlans = () => store.get();
+export const getMyPlansServerSnapshot = () => store.getServerSnapshot();
 export const subscribeToMyPlans = (cb: () => void) => store.subscribe(cb);
 export const upsertMyPlan = (entry: MyPlanEntry) => store.upsert(entry, (e) => e.id);
 export const removeMyPlan = (id: string) => store.remove(id, (e) => e.id);
