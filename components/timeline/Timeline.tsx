@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useJobAbilities } from "@/hooks/use-job-abilities";
 import { computeRowMitigation } from "@/lib/compute-mitigation";
 import { isAutoAttack as isAutoAttackAbility } from "@/lib/is-auto-attack";
-import type { RowMitigation } from "@/lib/compute-mitigation";
+import type { RowMitigation, RedundantMit } from "@/lib/compute-mitigation";
 import { usePreferencesStore } from "@/store/preferences-store";
 import { useShallow } from "zustand/react/shallow";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -30,6 +30,8 @@ import { MyTimeline } from "@/components/timeline/MyTimeline";
 import { ShareImageDialog } from "@/components/timeline/ShareImageDialog";
 import { ComparisonSummary, type DiffRow } from "@/components/timeline/ComparisonSummary";
 import { MistakeSummary, type MistakeRow } from "@/components/timeline/MistakeSummary";
+import { ConflictSummary } from "@/components/timeline/ConflictSummary";
+import { wastedAssignmentMap, conflictRows, type ConflictRow } from "@/lib/compute-conflicts";
 import { RowPeerChips } from "@/components/timeline/PresenceAvatars";
 import type { Peer } from "@/lib/collab/presence";
 import { useAssignmentHistory, type AssignmentOp } from "@/hooks/use-assignment-history";
@@ -62,6 +64,8 @@ type CellState = {
   onCooldown: boolean;
   inDuration: boolean;
   cooldownTooltip: string;
+  conflict: boolean;
+  conflictTooltip: string;
   compareState: "original-only" | "comparison-only" | "both" | "neither" | null;
 };
 
@@ -486,7 +490,7 @@ const TimelineBodyRow = memo(
           return [
             mistakeCell,
             ...abilities.map((ab, i) => {
-            const { assigned, onCooldown, inDuration, cooldownTooltip, compareState } = cellStates[cellIndex++];
+            const { assigned, onCooldown, inDuration, cooldownTooltip, conflict, conflictTooltip, compareState } = cellStates[cellIndex++];
             const showBadge = compareState === "original-only" || compareState === "comparison-only";
 
             const btn = (
@@ -504,6 +508,7 @@ const TimelineBodyRow = memo(
                     : inDuration
                     ? "border border-teal-200 dark:border-teal-800 hover:border-teal-400 dark:hover:border-teal-500"
                     : "border border-zinc-300 dark:border-slate-600 hover:border-teal-400 dark:hover:border-teal-500",
+                  assigned && conflict && "ring-2 ring-amber-500 dark:ring-amber-400",
                   compareState === "original-only" && "ring-2 ring-red-500 dark:ring-red-400",
                   compareState === "comparison-only" && "ring-2 ring-green-500 dark:ring-green-400"
                 )}
@@ -546,10 +551,10 @@ const TimelineBodyRow = memo(
                     aria-hidden
                   />
                 )}
-                {onCooldown ? (
+                {onCooldown || (assigned && conflict) ? (
                   <Tooltip>
                     <TooltipTrigger asChild>{cellContent}</TooltipTrigger>
-                    <TooltipContent>{cooldownTooltip}</TooltipContent>
+                    <TooltipContent>{onCooldown ? cooldownTooltip : conflictTooltip}</TooltipContent>
                   </Tooltip>
                 ) : (
                   cellContent
@@ -595,6 +600,8 @@ const TimelineBodyRow = memo(
         c.onCooldown === next.cellStates[i].onCooldown &&
         c.inDuration === next.cellStates[i].inDuration &&
         c.cooldownTooltip === next.cellStates[i].cooldownTooltip &&
+        c.conflict === next.cellStates[i].conflict &&
+        c.conflictTooltip === next.cellStates[i].conflictTooltip &&
         c.compareState === next.cellStates[i].compareState
     )
 );
@@ -602,6 +609,8 @@ const TimelineBodyRow = memo(
 const EMPTY_PHASES: PhaseDivider[] = [];
 const EMPTY_PEERS: Peer[] = [];
 const EMPTY_ROW_PEERS: Peer[] = [];
+const EMPTY_WASTED_MAP = new Map<string, RedundantMit>();
+const EMPTY_CONFLICT_ROWS: ConflictRow[] = [];
 
 /** Order-independent equality for assignment sets (identity = player|ability|ts). */
 function sameAssignments(a: MitigationAssignment[], b: MitigationAssignment[]): boolean {
@@ -1090,6 +1099,21 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     );
   }
 
+  // Bulk-remove assignments (used by the wasted-mitigation panel's fix actions).
+  // Deduped by identity so one removal resolving several rows is recorded once; routed
+  // through history so Ctrl+Z restores each, and through setAssignments so collab syncs.
+  const removeAssignments = useCallback((targets: MitigationAssignment[]) => {
+    const keys = new Set(targets.map((t) => `${t.playerId}|${t.abilityId}|${t.timestamp}`));
+    if (keys.size === 0) return;
+    for (const key of keys) {
+      const [playerId, abilityId, ts] = key.split("|");
+      recordHistory({ kind: "remove", assignment: { playerId, abilityId, timestamp: Number(ts) } });
+    }
+    setAssignments((prev) =>
+      prev.filter((a) => !keys.has(`${a.playerId}|${a.abilityId}|${a.timestamp}`))
+    );
+  }, [recordHistory]);
+
   // Apply a history op against the current assignments (not a snapshot), so undo/redo
   // touches only the single toggled cell and never clobbers a collaborator's edit.
   // Cooldown isn't re-checked — undo/redo restores prior intent and adds dedupe by key.
@@ -1162,12 +1186,38 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     return result;
   }, [visibleRows, localPlayers]);
 
+  const rowMitigations = useMemo(
+    (): RowMitigation[] =>
+      visibleRows.map((row) =>
+        computeRowMitigation(
+          row.timestamp,
+          row.damageEvent,
+          allJobs,
+          filteredAbilitiesByJob,
+          playerByJob,
+          assignmentsByPlayerAbility
+        )
+      ),
+    [visibleRows, allJobs, filteredAbilitiesByJob, playerByJob, assignmentsByPlayerAbility]
+  );
+
+  // Wasted-mitigation overlaps (edit + full view only — view links / My-plan unaffected).
+  const conflictsEnabled = !readOnly && timelineViewMode === "full";
+  const wastedMap = useMemo(
+    () => (conflictsEnabled ? wastedAssignmentMap(rowMitigations) : EMPTY_WASTED_MAP),
+    [conflictsEnabled, rowMitigations]
+  );
+  const conflictSummaryRows = useMemo(
+    () => (conflictsEnabled ? conflictRows(rowMitigations, visibleRows) : EMPTY_CONFLICT_ROWS),
+    [conflictsEnabled, rowMitigations, visibleRows]
+  );
+
   const rowCellStates = useMemo((): CellState[][] =>
     visibleRows.map((row) =>
       selectedJobs.flatMap((job) => {
         const abilities = filteredAbilitiesByJob[job] ?? [];
         if (abilities.length === 0)
-          return [{ assigned: false, onCooldown: false, inDuration: false, cooldownTooltip: "", compareState: null as CellState["compareState"] }];
+          return [{ assigned: false, onCooldown: false, inDuration: false, cooldownTooltip: "", conflict: false, conflictTooltip: "", compareState: null as CellState["compareState"] }];
         return abilities.map((ab) => {
           const player = playerByJob.get(job);
           const assigned = player
@@ -1193,7 +1243,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
               const inDuration = list.some(
                 (a) => row.timestamp > a.timestamp && row.timestamp <= a.timestamp + durationMs - bufferMs
               );
-              if (inDuration) return { assigned: false, onCooldown: false, inDuration: true, cooldownTooltip: "", compareState };
+              if (inDuration) return { assigned: false, onCooldown: false, inDuration: true, cooldownTooltip: "", conflict: false, conflictTooltip: "", compareState };
             }
             if (ability.cooldown > 0) {
               const cooldownMs = ability.cooldown * 1000;
@@ -1206,32 +1256,25 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                   onCooldown: true,
                   inDuration: false,
                   cooldownTooltip: `On cooldown (expires at ${formatTimestamp(blocking.timestamp + cooldownMs)})`,
+                  conflict: false,
+                  conflictTooltip: "",
                   compareState,
                 };
               }
             }
           }
 
-          return { assigned, onCooldown: false, inDuration: false, cooldownTooltip: "", compareState };
+          // Flag an assigned cell whose mitigation is wasted (doesn't stack).
+          const wasted = assigned && player ? wastedMap.get(`${player.id}|${ab.id}|${row.timestamp}`) : undefined;
+          const conflictTooltip = wasted
+            ? `Redundant — ${wasted.kept.job} already covers this with ${wasted.kept.abilityName}`
+            : "";
+
+          return { assigned, onCooldown: false, inDuration: false, cooldownTooltip: "", conflict: !!wasted, conflictTooltip, compareState };
         });
       })
     ),
-    [assignedSet, comparisonSet, assignmentsByPlayerAbility, abilityLookup, playerByJob, visibleRows, selectedJobs, filteredAbilitiesByJob, activationBuffer]
-  );
-
-  const rowMitigations = useMemo(
-    (): RowMitigation[] =>
-      visibleRows.map((row) =>
-        computeRowMitigation(
-          row.timestamp,
-          row.damageEvent,
-          allJobs,
-          filteredAbilitiesByJob,
-          playerByJob,
-          assignmentsByPlayerAbility
-        )
-      ),
-    [visibleRows, allJobs, filteredAbilitiesByJob, playerByJob, assignmentsByPlayerAbility]
+    [assignedSet, comparisonSet, assignmentsByPlayerAbility, abilityLookup, playerByJob, visibleRows, selectedJobs, filteredAbilitiesByJob, activationBuffer, wastedMap]
   );
 
   const totalColCount = useMemo(() => {
@@ -1832,6 +1875,8 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
         )}
 
         {isComparing && <ComparisonSummary rows={comparisonSummaryRows} label={comparisonLabel} url={comparisonUrl} />}
+
+        {conflictSummaryRows.length > 0 && <ConflictSummary rows={conflictSummaryRows} onRemove={removeAssignments} />}
 
         {showMistakesColumn && mistakeSummaryRows.length > 0 && <MistakeSummary rows={mistakeSummaryRows} />}
 

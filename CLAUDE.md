@@ -61,8 +61,6 @@ The app is an **FFXIV Mitigation Planner** — an interactive raid planning tool
 |---|---|
 | `/` | Homepage: FFLogs URL import, recently viewed plans, create new plan |
 | `/plan/[id]` | Core plan editor: vertical timeline, mitigation assignment, cooldown logic |
-| `/plan/[id]/compare` | Overlay actual FFLogs execution on planned timeline |
-| `/plan/[id]/mistakes` | Death/vuln/damage-down timeline and per-player summary |
 | `/library` | Ability library: toggle abilities per job |
 | `/encounters` | Encounter presets browser, grouped by raid tier |
 

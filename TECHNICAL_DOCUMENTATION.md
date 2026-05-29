@@ -179,35 +179,7 @@ Renders the plan editor in "new plan" mode — no Firestore fetch, starts with a
 - Bulk import encounters
 - No authentication required — guarded by a local flag or environment variable
 
-### 3.6 Plan Comparison (/plan/[id]/compare)
-
-**Features:**
-
-- Input FFLogs URL
-- Import actual execution
-- Overlay actual usage on planned timeline
-- Drift detection
-- Missed cooldowns
-- Early/late usage
-- Missed buff windows
-- Per‑player summary
-- Per‑event summary
-- Single log comparison only
-
-### 3.7 Mistake Overview (/plan/[id]/mistakes)
-
-*(Future but planned)*
-
-**Features:**
-
-- Timeline of deaths
-- Timeline of vuln stacks
-- Timeline of damage downs
-- Per‑player mistake summary
-- Per‑event mistake summary
-- "Most dangerous events" ranking
-
-### 3.8 Raidplan.io Integration
+### 3.6 Raidplan.io Integration
 
 **Features:**
 
