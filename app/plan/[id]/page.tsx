@@ -140,6 +140,7 @@ export default function PlanPage({
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}
+        encounterTier={storePlan.encounterTier}
         peers={peers}
         onHover={updateCursor}
         headerLeft={

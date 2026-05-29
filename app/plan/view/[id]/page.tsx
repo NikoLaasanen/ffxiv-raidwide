@@ -131,6 +131,7 @@ export default function PlanViewPage({
         viewLinkId={storePlan.viewLinkId}
         title={storePlan.title}
         encounterId={storePlan.encounterId}
+        encounterTier={storePlan.encounterTier}
         headerLeft={
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {storePlan.players.length} players · {visibleRows.length} timeline events · {duration}

@@ -8,7 +8,8 @@ import type { JobAbilityRecord } from "@/types/job-ability";
 import { ChevronDown, ChevronRight, ListX, User } from "lucide-react";
 import { formatTimestamp } from "@/lib/format-timestamp";
 import { cn } from "@/lib/utils";
-import { JOB_ROLE_COLOR, ALL_JOBS } from "@/lib/jobs";
+import { JOB_ROLE_COLOR } from "@/lib/jobs";
+import { buildMyTimelineData } from "@/lib/my-timeline";
 import { DAMAGE_TYPE_ICON, MECHANIC_BADGE, FALLBACK_JOB_COLOR } from "@/lib/timeline-constants";
 import Image from "next/image";
 import { usePreferencesStore } from "@/store/preferences-store";
@@ -25,10 +26,6 @@ interface MyTimelineProps {
   currentTimestamp?: number | null;
   onTogglePhase?: (timestamp: number) => void;
 }
-
-type DisplayItem =
-  | { kind: "phase"; phase: PhaseDivider; endTimestamp: number }
-  | { kind: "row"; row: TimelineRow; abilityEntries: { job: JobAbbreviation; abilityId: string }[] };
 
 export function MyTimeline({
   players,
@@ -53,36 +50,11 @@ export function MyTimeline({
 
   const isMultiJob = selectedJobs.length > 1;
 
-  const sortedSelectedJobs = useMemo(
-    () => [...selectedJobs].sort((a, b) => ALL_JOBS.indexOf(a) - ALL_JOBS.indexOf(b)),
-    [selectedJobs]
-  );
-
-  const selectedPlayers = useMemo(
-    () => players.filter((p) => sortedSelectedJobs.includes(p.job)),
-    [players, sortedSelectedJobs]
-  );
-
-  // Merged ability list, deduped by id, in role order
-  const playerAbilities = useMemo(() => {
-    if (sortedSelectedJobs.length === 0) return [];
-    const seen = new Set<string>();
-    const result: JobAbilityRecord[] = [];
-    for (const job of sortedSelectedJobs) {
-      for (const ab of abilitiesByJob[job] ?? []) {
-        if (!seen.has(ab.id)) {
-          seen.add(ab.id);
-          result.push(ab);
-        }
-      }
-    }
-    return result;
-  }, [sortedSelectedJobs, abilitiesByJob]);
-
-  const abilityById = useMemo(
-    () => new Map(playerAbilities.map((a) => [a.id, a])),
-    [playerAbilities]
-  );
+  const { sortedSelectedJobs, selectedPlayers, playerAbilities, abilityById, myAssignments, myRows, displayItems } =
+    useMemo(
+      () => buildMyTimelineData({ players, timeline, phases, assignments, abilitiesByJob, selectedJobs }),
+      [players, timeline, phases, assignments, abilitiesByJob, selectedJobs]
+    );
 
   const hasCleanseCapability = useMemo(
     () => sortedSelectedJobs.some((job) =>
@@ -97,32 +69,6 @@ export function MyTimeline({
     ),
     [sortedSelectedJobs, abilitiesByJob]
   );
-
-  // Track which job each assignment belongs to for display
-  const myAssignments = useMemo(
-    () => assignments.filter((a) => selectedPlayers.some((p) => p.id === a.playerId)),
-    [selectedPlayers, assignments]
-  );
-
-  const playerIdToJob = useMemo(
-    () => new Map(selectedPlayers.map((p) => [p.id, p.job])),
-    [selectedPlayers]
-  );
-
-  const assignmentsByTimestamp = useMemo(() => {
-    const map = new Map<number, { job: JobAbbreviation; abilityId: string }[]>();
-    for (const a of myAssignments) {
-      const job = playerIdToJob.get(a.playerId);
-      if (!job) continue;
-      const list = map.get(a.timestamp) ?? [];
-      list.push({ job, abilityId: a.abilityId });
-      map.set(a.timestamp, list);
-    }
-    for (const [ts, entries] of map) {
-      map.set(ts, entries.sort((a, b) => ALL_JOBS.indexOf(a.job) - ALL_JOBS.indexOf(b.job)));
-    }
-    return map;
-  }, [myAssignments, playerIdToJob]);
 
   const { highThreshold, medThreshold } = useMemo(() => {
     const damages = timeline
@@ -140,45 +86,6 @@ export function MyTimeline({
     }
     return map;
   }, [myAssignments]);
-
-  const myRows = useMemo(
-    () => timeline.filter((row) => !row.hidden && assignmentsByTimestamp.has(row.timestamp)),
-    [timeline, assignmentsByTimestamp]
-  );
-
-  const displayItems = useMemo((): DisplayItem[] => {
-    const sortedPhases = [...phases].sort((a, b) => a.timestamp - b.timestamp);
-    const phaseEndTs = sortedPhases.map((ph, i) => {
-      const next = sortedPhases[i + 1];
-      return next ? next.timestamp : (timeline[timeline.length - 1]?.timestamp ?? ph.timestamp);
-    });
-
-    const items: DisplayItem[] = [];
-    let lastPhaseIdx = -1;
-
-    for (let r = 0; r < myRows.length; r++) {
-      const row = myRows[r];
-      let currentPhaseIdx = -1;
-      for (let i = 0; i < sortedPhases.length; i++) {
-        if (sortedPhases[i].timestamp <= row.timestamp) currentPhaseIdx = i;
-        else break;
-      }
-      if (currentPhaseIdx !== lastPhaseIdx && currentPhaseIdx >= 0) {
-        items.push({
-          kind: "phase",
-          phase: sortedPhases[currentPhaseIdx],
-          endTimestamp: phaseEndTs[currentPhaseIdx],
-        });
-        lastPhaseIdx = currentPhaseIdx;
-      }
-      if (currentPhaseIdx >= 0 && sortedPhases[currentPhaseIdx].collapsed) continue;
-      const abilityEntries = (assignmentsByTimestamp.get(row.timestamp) ?? [])
-        .filter(({ abilityId }) => abilityById.has(abilityId));
-      if (abilityEntries.length === 0) continue;
-      items.push({ kind: "row", row, abilityEntries });
-    }
-    return items;
-  }, [myRows, phases, timeline, assignmentsByTimestamp, abilityById]);
 
   const hasNoAssignments = selectedPlayers.length > 0 && myRows.length === 0;
   const usedCount = playerAbilities.filter((a) => (usageByAbility.get(a.id) ?? 0) > 0).length;

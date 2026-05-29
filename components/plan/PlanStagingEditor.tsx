@@ -51,16 +51,18 @@ export function PlanStagingEditor({ plan, hasHydrated, badgeLabel, casts, onCons
   // Set when we navigate away intentionally (save/discard) so consuming the
   // source doesn't trip the "nothing staged" redirect below.
   const leaving = useRef(false);
-  const seeded = useRef(false);
 
-  // Seed local edit state from the draft once it's available.
-  useEffect(() => {
-    if (plan && !seeded.current) {
-      seeded.current = true;
-      setCurrentPhases(plan.phases ?? []);
-      setCurrentAssignments(plan.assignments ?? []);
-    }
-  }, [plan]);
+  // Seed local edit state from the draft during render (keyed on the stable
+  // draft id) so the values are in place before Timeline mounts. A post-mount
+  // effect would leave Timeline mounting with empty phases first, which doesn't
+  // reliably propagate into its internal state. Keying on the id (not the array
+  // reference) keeps this from looping.
+  const [seededId, setSeededId] = useState<string | null>(null);
+  if (plan && seededId !== plan.id) {
+    setSeededId(plan.id);
+    setCurrentPhases(plan.phases ?? []);
+    setCurrentAssignments(plan.assignments ?? []);
+  }
 
   // Nothing staged (e.g. direct navigation or after consuming) → go home.
   useEffect(() => {

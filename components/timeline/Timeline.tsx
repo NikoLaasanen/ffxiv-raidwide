@@ -28,6 +28,7 @@ import { FavoriteButton } from "@/components/plan/FavoriteButton";
 import { CompareDialog } from "@/components/plan/CompareDialog";
 import { usePlanStore } from "@/store/plan-store";
 import { MyTimeline } from "@/components/timeline/MyTimeline";
+import { ShareImageDialog } from "@/components/timeline/ShareImageDialog";
 import { ComparisonSummary, type DiffRow } from "@/components/timeline/ComparisonSummary";
 import { MistakeSummary, type MistakeRow } from "@/components/timeline/MistakeSummary";
 import { RowPeerChips } from "@/components/timeline/PresenceAvatars";
@@ -48,6 +49,7 @@ interface TimelineProps {
   viewLinkId?: string;
   title?: string;
   encounterId?: string | null;
+  encounterTier?: string | null;
   raidplanLink?: string;
   headerLeft?: React.ReactNode;
   /** Live collaborators present on this plan. */
@@ -610,7 +612,24 @@ function sameAssignments(a: MitigationAssignment[], b: MitigationAssignment[]): 
   return b.every((x) => set.has(key(x)));
 }
 
-export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, syncedAssignments, onAssignmentsChange, onPhasesChange, onPlayersChange, readOnly, viewLinkId, title, encounterId, raidplanLink, headerLeft, peers = EMPTY_PEERS, onHover }: TimelineProps) {
+/** Value equality for phase divider sets (timestamp + name + collapsed). */
+function samePhases(a: PhaseDivider[], b: PhaseDivider[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (p: PhaseDivider) => `${p.timestamp}|${p.name}|${p.collapsed}`;
+  const set = new Set(a.map(key));
+  return b.every((p) => set.has(key(p)));
+}
+
+/** Order-independent value equality for player rosters (id + job + mistake flag + ability ids). */
+function samePlayers(a: Player[], b: Player[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (p: Player) =>
+    `${p.id}|${p.job}|${p.mistakeColumnsEnabled}|${[...p.abilities.map((x) => x.id)].sort().join(",")}`;
+  const set = new Set(a.map(key));
+  return b.every((p) => set.has(key(p)));
+}
+
+export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, initialAssignments, syncedAssignments, onAssignmentsChange, onPhasesChange, onPlayersChange, readOnly, viewLinkId, title, encounterId, encounterTier, raidplanLink, headerLeft, peers = EMPTY_PEERS, onHover }: TimelineProps) {
   const {
     showAutoAttacks,
     showDamageColumn,
@@ -642,7 +661,29 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   );
 
   const [localPlayers, setLocalPlayers] = useState<Player[]>(players);
-  useEffect(() => setLocalPlayers(players), [players]);
+  // Same optimistic-edit protection as phases below: a locally-added job (with a
+  // debounced emitPlayers write) must not be clobbered by an interleaved remote
+  // snapshot that doesn't yet reflect it. `pendingPlayersRef` holds an
+  // unconfirmed local edit (set by `mutatePlayers`); while set, ignore stale
+  // snapshots, clear it once the server confirms, otherwise adopt remote changes.
+  const pendingPlayersRef = useRef<Player[] | null>(null);
+  useEffect(() => {
+    if (pendingPlayersRef.current && samePlayers(pendingPlayersRef.current, players)) {
+      pendingPlayersRef.current = null;
+    }
+    setLocalPlayers((prev) => {
+      if (samePlayers(prev, players)) return prev;
+      if (pendingPlayersRef.current) return prev; // stale snapshot predating our pending edit
+      return players; // genuine remote change
+    });
+  }, [players]);
+  const mutatePlayers = useCallback((updater: (prev: Player[]) => Player[]) => {
+    setLocalPlayers((prev) => {
+      const next = updater(prev);
+      if (next !== prev) pendingPlayersRef.current = next;
+      return next;
+    });
+  }, []);
   const onPlayersChangeRef = useRef(onPlayersChange);
   useLayoutEffect(() => { onPlayersChangeRef.current = onPlayersChange; });
   useEffect(() => { onPlayersChangeRef.current?.(localPlayers); }, [localPlayers]);
@@ -696,7 +737,25 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   useEffect(() => { setLocalTimeline(timeline); }, [timeline]);
 
   const [localPhases, setLocalPhases] = useState<PhaseDivider[]>(phases);
-  useEffect(() => { setLocalPhases(phases); }, [phases]);
+  // Phase edits are optimistic and pushed to the server with a debounce, so a
+  // remote snapshot for another field can echo back the *old* phases mid-flight.
+  // `pendingPhasesRef` holds a local edit the server hasn't confirmed yet (set by
+  // the mutation handlers below): while it's set, ignore incoming snapshots that
+  // don't reflect it (they're stale), and clear it once the server confirms it.
+  // When there's no pending edit, adopt genuine remote changes. Mirrors the
+  // synced-assignments guard above.
+  const pendingPhasesRef = useRef<PhaseDivider[] | null>(null);
+  useEffect(() => {
+    // Server now reflects our last local edit → it's confirmed, stop guarding.
+    if (pendingPhasesRef.current && samePhases(pendingPhasesRef.current, phases)) {
+      pendingPhasesRef.current = null;
+    }
+    setLocalPhases((prev) => {
+      if (samePhases(prev, phases)) return prev;
+      if (pendingPhasesRef.current) return prev; // stale snapshot predating our pending edit
+      return phases; // genuine remote change
+    });
+  }, [phases]);
   const onPhasesChangeRef = useRef(onPhasesChange);
   useLayoutEffect(() => { onPhasesChangeRef.current = onPhasesChange; });
   useEffect(() => { onPhasesChangeRef.current?.(localPhases); }, [localPhases]);
@@ -806,21 +865,31 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function addPhase(atTimestamp: number) {
+  // Apply a local phase edit and mark it pending so an in-flight remote snapshot
+  // can't clobber it before the server confirms our (debounced) write.
+  const mutatePhases = useCallback((updater: (prev: PhaseDivider[]) => PhaseDivider[]) => {
     setLocalPhases((prev) => {
+      const next = updater(prev);
+      if (next !== prev) pendingPhasesRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const addPhase = useCallback((atTimestamp: number) => {
+    mutatePhases((prev) => {
       if (prev.some((p) => p.timestamp === atTimestamp)) return prev;
       return [...prev, { timestamp: atTimestamp, name: `Phase ${prev.length + 1}`, collapsed: false }];
     });
-  }
+  }, [mutatePhases]);
   const stableTogglePhase = useCallback((timestamp: number) => {
-    setLocalPhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, collapsed: !p.collapsed } : p));
-  }, []);
+    mutatePhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, collapsed: !p.collapsed } : p));
+  }, [mutatePhases]);
   const stableRenamePhase = useCallback((timestamp: number, name: string) => {
-    setLocalPhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, name } : p));
-  }, []);
+    mutatePhases((prev) => prev.map((p) => p.timestamp === timestamp ? { ...p, name } : p));
+  }, [mutatePhases]);
   const stableRemovePhase = useCallback((timestamp: number) => {
-    setLocalPhases((prev) => prev.filter((p) => p.timestamp !== timestamp));
-  }, []);
+    mutatePhases((prev) => prev.filter((p) => p.timestamp !== timestamp));
+  }, [mutatePhases]);
 
   const playerByJob = useMemo(
     () => new Map(localPlayers.map((p) => [p.job, p])),
@@ -976,7 +1045,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       setSelectedJobs((prev) => prev.filter((j) => j !== job));
     } else {
       if (!localPlayers.some((p) => p.job === job)) {
-        setLocalPlayers((prev) => [...prev, { id: `player-${job}`, job, abilities: [], mistakeColumnsEnabled: false }]);
+        mutatePlayers((prev) => [...prev, { id: `player-${job}`, job, abilities: [], mistakeColumnsEnabled: false }]);
       }
       setSelectedJobs((prev) => [...prev, job]);
     }
@@ -1265,6 +1334,18 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                     <ExternalLink size={16} />
                   </a>
                 </Button>
+              )}
+              {timelineViewMode === "my" && (
+                <ShareImageDialog
+                  players={localPlayers}
+                  timeline={localTimeline}
+                  phases={localPhases}
+                  assignments={assignments}
+                  abilitiesByJob={filteredAbilitiesByJob}
+                  selectedJobs={readOnly ? myPlanViewJobs : myPlanEditJobs}
+                  title={title ?? ""}
+                  encounterTier={encounterTier}
+                />
               )}
               {viewLinkId && title !== undefined && (
                 <FavoriteButton viewLinkId={viewLinkId} title={title} encounterId={encounterId ?? null} />
