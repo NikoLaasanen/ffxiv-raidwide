@@ -54,7 +54,7 @@ function SortableTh({
 
 export default function EncountersPage() {
   const router = useRouter();
-  const setPlan = usePlanStore((s) => s.setPlan);
+  const setDraftPlan = usePlanStore((s) => s.setDraftPlan);
   const { data: encounters = [], isLoading: loading } = useEncounters();
 
   const [search, setSearch] = useState("");
@@ -65,9 +65,8 @@ export default function EncountersPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const handleCreate = (encounter: EncounterDoc) => {
-    const plan = buildPlanFromEncounter(encounter);
-    setPlan(plan);
-    router.push(`/plan/${plan.editLinkId}`);
+    setDraftPlan(buildPlanFromEncounter(encounter));
+    router.push("/plan/new");
   };
 
   const handleSort = (field: SortField) => {

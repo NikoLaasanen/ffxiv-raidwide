@@ -7,8 +7,10 @@ import type { MitigationAssignment } from "@/types/timeline";
 interface PlanState {
   _hasHydrated: boolean;
   plan: Plan | null;
-  /** Unsaved plan copy awaiting explicit save on the draft preview page. */
+  /** Unsaved plan awaiting explicit save on the draft preview page. */
   draftPlan: Plan | null;
+  /** Whether the staged draft is a copy of an existing plan (vs. a fresh preset). */
+  draftIsCopy: boolean;
   pendingImport: FflogsImportResult | null;
   selectedTimestamp: number | null;
   mode: "edit" | "view";
@@ -22,7 +24,7 @@ interface PlanState {
 interface PlanActions {
   _setHasHydrated: (v: boolean) => void;
   setPlan: (plan: Plan) => void;
-  setDraftPlan: (plan: Plan | null) => void;
+  setDraftPlan: (plan: Plan | null, isCopy?: boolean) => void;
   setPendingImport: (data: FflogsImportResult | null) => void;
   updatePlan: (updater: (plan: Plan) => Plan) => void;
   undo: () => void;
@@ -38,6 +40,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       _hasHydrated: false,
       plan: null,
       draftPlan: null,
+      draftIsCopy: false,
       pendingImport: null,
       selectedTimestamp: null,
       mode: "edit",
@@ -49,7 +52,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
 
       _setHasHydrated: (v) => set({ _hasHydrated: v }),
       setPlan: (plan) => set({ plan, past: [], future: [], comparisonAssignments: null, comparisonLabel: null, comparisonUrl: null }),
-      setDraftPlan: (plan) => set({ draftPlan: plan }),
+      setDraftPlan: (plan, isCopy = false) => set({ draftPlan: plan, draftIsCopy: isCopy }),
       setPendingImport: (data) => set({ pendingImport: data }),
 
       updatePlan: (updater) => {
@@ -92,7 +95,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       name: "ffxiv-raidwide-plan",
       storage: createJSONStorage(() => localStorage),
       version: 1,
-      partialize: (state) => ({ pendingImport: state.pendingImport, draftPlan: state.draftPlan }),
+      partialize: (state) => ({ pendingImport: state.pendingImport, draftPlan: state.draftPlan, draftIsCopy: state.draftIsCopy }),
       onRehydrateStorage: () => (state) => {
         state?._setHasHydrated(true);
       },

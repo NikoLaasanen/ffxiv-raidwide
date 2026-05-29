@@ -39,7 +39,7 @@ export default function PlanViewPage({
     // whether to persist it. The original is never written to. Clear any
     // pending import so only one draft source is active at a time.
     setPendingImport(null);
-    setDraftPlan(buildPlanCopy(storePlan));
+    setDraftPlan(buildPlanCopy(storePlan), true);
     router.push("/plan/new");
   }
 

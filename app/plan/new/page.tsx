@@ -8,6 +8,7 @@ import { buildPlanFromImport } from "@/lib/create-plan-from-encounter";
 export default function NewPlanPage() {
   const pendingImport = usePlanStore((s) => s.pendingImport);
   const draftPlan = usePlanStore((s) => s.draftPlan);
+  const draftIsCopy = usePlanStore((s) => s.draftIsCopy);
   const hasHydrated = usePlanStore((s) => s._hasHydrated);
   const setPendingImport = usePlanStore((s) => s.setPendingImport);
   const setDraftPlan = usePlanStore((s) => s.setDraftPlan);
@@ -19,7 +20,7 @@ export default function NewPlanPage() {
     [draftPlan, pendingImport],
   );
 
-  const isCopy = draftPlan !== null;
+  const isCopy = draftPlan !== null && draftIsCopy;
 
   return (
     <PlanStagingEditor
@@ -27,7 +28,7 @@ export default function NewPlanPage() {
       hasHydrated={hasHydrated}
       badgeLabel={isCopy ? "Unsaved copy" : "Unsaved plan"}
       casts={isCopy ? undefined : pendingImport?.casts}
-      onConsumeSource={() => (isCopy ? setDraftPlan(null) : setPendingImport(null))}
+      onConsumeSource={() => (draftPlan ? setDraftPlan(null) : setPendingImport(null))}
     />
   );
 }

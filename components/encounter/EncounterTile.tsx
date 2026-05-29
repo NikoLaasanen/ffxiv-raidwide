@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { usePlanStore } from "@/store/plan-store";
+import { buildPlanFromEncounter } from "@/lib/create-plan-from-encounter";
 import type { EncounterDoc, EncounterType } from "@/types/encounter";
 
 // ─── EncounterCoverArt ──────────────────────────────────────────────────────
@@ -144,30 +145,12 @@ export function EncounterTile({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
-  const setPlan = usePlanStore((s) => s.setPlan);
+  const setDraftPlan = usePlanStore((s) => s.setDraftPlan);
 
   const handleClick = () => {
-    const editLinkId = crypto.randomUUID();
-    const viewLinkId = crypto.randomUUID();
-    const now = Date.now();
-    setPlan({
-      id: editLinkId,
-      editLinkId,
-      viewLinkId,
-      title: enc.name,
-      encounterId: enc.id,
-      encounterType: enc.type ?? null,
-      encounterTier: enc.tier ?? null,
-      raidplanLink: null,
-      timeline: enc.timeline,
-      players: [],
-      phases: enc.phases ?? [],
-      assignments: [],
-      createdAt: now,
-      updatedAt: now,
-    });
+    setDraftPlan(buildPlanFromEncounter(enc));
     onNavigate?.();
-    router.push(`/plan/${editLinkId}`);
+    router.push("/plan/new");
   };
 
   return (

@@ -31,7 +31,7 @@ export default function CommandPalette({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const setPlan = usePlanStore((s) => s.setPlan);
+  const setDraftPlan = usePlanStore((s) => s.setDraftPlan);
   const [query, setQuery] = useState("");
 
   const plans = useSyncExternalStore(subscribeToMyPlans, getMyPlans, getMyPlansServerSnapshot);
@@ -53,9 +53,8 @@ export default function CommandPalette({
   };
 
   const createFromEncounter = (encounter: EncounterDoc) => {
-    const plan = buildPlanFromEncounter(encounter);
-    setPlan(plan);
-    navigate(`/plan/${plan.editLinkId}`);
+    setDraftPlan(buildPlanFromEncounter(encounter));
+    navigate("/plan/new");
   };
 
   const q = query.trim().toLowerCase();
