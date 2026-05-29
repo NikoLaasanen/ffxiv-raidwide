@@ -28,6 +28,8 @@ import { FavoriteButton } from "@/components/plan/FavoriteButton";
 import { CompareDialog } from "@/components/plan/CompareDialog";
 import { usePlanStore } from "@/store/plan-store";
 import { MyTimeline } from "@/components/timeline/MyTimeline";
+import { ComparisonSummary, type DiffRow } from "@/components/timeline/ComparisonSummary";
+import { MistakeSummary, type MistakeRow } from "@/components/timeline/MistakeSummary";
 import { RowPeerChips } from "@/components/timeline/PresenceAvatars";
 import type { Peer } from "@/lib/collab/presence";
 
@@ -859,6 +861,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
 
   const comparisonAssignments = usePlanStore((s) => s.comparisonAssignments);
   const comparisonLabel = usePlanStore((s) => s.comparisonLabel);
+  const comparisonUrl = usePlanStore((s) => s.comparisonUrl);
   const setComparison = usePlanStore((s) => s.setComparison);
 
   // Clear comparison when navigating to a different plan
@@ -902,6 +905,49 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
     }
     return map;
   }, [abilitiesByJob, allJobs]);
+
+  // Per-mechanic diff for the comparison summary section (complete diff, independent
+  // of selectedJobs / ability filters). Missing = original-only, Extra = comparison-only.
+  const comparisonSummaryRows = useMemo((): DiffRow[] => {
+    if (comparisonSet === null || comparisonAssignments === null) return [];
+    const playerById = new Map(localPlayers.map((p) => [p.id, p]));
+    const rowByTimestamp = new Map(localTimeline.map((r) => [r.timestamp, r]));
+    const byTimestamp = new Map<number, DiffRow>();
+
+    const getRow = (timestamp: number): DiffRow | null => {
+      const tlRow = rowByTimestamp.get(timestamp);
+      if (!tlRow) return null;
+      let entry = byTimestamp.get(timestamp);
+      if (!entry) {
+        entry = { timestamp, bossAbility: tlRow.bossAbility, missing: [], extra: [] };
+        byTimestamp.set(timestamp, entry);
+      }
+      return entry;
+    };
+
+    const resolve = (a: MitigationAssignment) => {
+      const player = playerById.get(a.playerId);
+      if (!player) return null;
+      const ability = abilityLookup.get(`${player.job}|${a.abilityId}`);
+      if (!ability) return null;
+      return { job: player.job, abilityName: ability.name, iconPath: ability.iconPath };
+    };
+
+    for (const a of assignments) {
+      if (comparisonSet.has(`${a.playerId}|${a.abilityId}|${a.timestamp}`)) continue;
+      const entry = resolve(a);
+      const row = entry && getRow(a.timestamp);
+      if (entry && row) row.missing.push(entry);
+    }
+    for (const a of comparisonAssignments) {
+      if (assignedSet.has(`${a.playerId}|${a.abilityId}|${a.timestamp}`)) continue;
+      const entry = resolve(a);
+      const row = entry && getRow(a.timestamp);
+      if (entry && row) row.extra.push(entry);
+    }
+
+    return [...byTimestamp.values()].sort((a, b) => a.timestamp - b.timestamp);
+  }, [comparisonSet, comparisonAssignments, assignedSet, assignments, localPlayers, localTimeline, abilityLookup]);
 
   const filteredAbilitiesByJob = useMemo(
     () =>
@@ -981,6 +1027,23 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
       }),
     [localTimeline, showAutoAttacks]
   );
+
+  // Per-mechanic mistakes summary (deaths + damage downs). Mirrors the per-row predicates
+  // used in TimelineBodyRow; only rows with at least one mistake are kept.
+  const mistakeSummaryRows = useMemo((): MistakeRow[] => {
+    const result: MistakeRow[] = [];
+    for (const row of visibleRows) {
+      const deaths = localPlayers
+        .filter((p) => row.playerMistakes[p.id]?.dead)
+        .map((p) => ({ job: p.job }));
+      const damageDowns = localPlayers
+        .filter((p) => row.playerMistakes[p.id]?.damageDownTimestamp != null)
+        .map((p) => ({ job: p.job }));
+      if (deaths.length === 0 && damageDowns.length === 0) continue;
+      result.push({ timestamp: row.timestamp, bossAbility: row.bossAbility, deaths, damageDowns });
+    }
+    return result;
+  }, [visibleRows, localPlayers]);
 
   const rowCellStates = useMemo((): CellState[][] =>
     visibleRows.map((row) =>
@@ -1213,7 +1276,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
                   originalTitle={title ?? ""}
                   abilitiesByJob={abilitiesByJob}
                   abilitiesLoading={isLoading}
-                  onCompare={(a, label) => setComparison(a, label)}
+                  onCompare={(a, label, url) => setComparison(a, label, url)}
                   onClear={() => setComparison(null, null)}
                 />
               )}
@@ -1617,6 +1680,10 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             onTogglePhase={stableTogglePhase}
           />
         )}
+
+        {isComparing && <ComparisonSummary rows={comparisonSummaryRows} label={comparisonLabel} url={comparisonUrl} />}
+
+        {showMistakesColumn && mistakeSummaryRows.length > 0 && <MistakeSummary rows={mistakeSummaryRows} />}
 
         {!readOnly && timelineViewMode !== "my" && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 p-4">
           {/* Active roster strip — Option A */}

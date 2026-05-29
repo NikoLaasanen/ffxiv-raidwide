@@ -16,6 +16,7 @@ interface PlanState {
   future: Plan[];
   comparisonAssignments: MitigationAssignment[] | null;
   comparisonLabel: string | null;
+  comparisonUrl: string | null;
 }
 
 interface PlanActions {
@@ -28,7 +29,7 @@ interface PlanActions {
   redo: () => void;
   setSelectedTimestamp: (ts: number | null) => void;
   setMode: (mode: "edit" | "view") => void;
-  setComparison: (assignments: MitigationAssignment[] | null, label: string | null) => void;
+  setComparison: (assignments: MitigationAssignment[] | null, label: string | null, url?: string | null) => void;
 }
 
 export const usePlanStore = create<PlanState & PlanActions>()(
@@ -44,9 +45,10 @@ export const usePlanStore = create<PlanState & PlanActions>()(
       future: [],
       comparisonAssignments: null,
       comparisonLabel: null,
+      comparisonUrl: null,
 
       _setHasHydrated: (v) => set({ _hasHydrated: v }),
-      setPlan: (plan) => set({ plan, past: [], future: [], comparisonAssignments: null, comparisonLabel: null }),
+      setPlan: (plan) => set({ plan, past: [], future: [], comparisonAssignments: null, comparisonLabel: null, comparisonUrl: null }),
       setDraftPlan: (plan) => set({ draftPlan: plan }),
       setPendingImport: (data) => set({ pendingImport: data }),
 
@@ -84,7 +86,7 @@ export const usePlanStore = create<PlanState & PlanActions>()(
 
       setSelectedTimestamp: (ts) => set({ selectedTimestamp: ts }),
       setMode: (mode) => set({ mode }),
-      setComparison: (assignments, label) => set({ comparisonAssignments: assignments, comparisonLabel: label }),
+      setComparison: (assignments, label, url = null) => set({ comparisonAssignments: assignments, comparisonLabel: label, comparisonUrl: url }),
     }),
     {
       name: "ffxiv-raidwide-plan",

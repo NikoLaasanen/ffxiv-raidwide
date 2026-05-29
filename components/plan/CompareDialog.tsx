@@ -30,7 +30,7 @@ interface CompareDialogProps {
   originalTitle: string;
   abilitiesByJob: Record<JobAbbreviation, JobAbilityRecord[]>;
   abilitiesLoading: boolean;
-  onCompare: (assignments: MitigationAssignment[], label: string) => void;
+  onCompare: (assignments: MitigationAssignment[], label: string, url: string) => void;
   onClear: () => void;
 }
 
@@ -60,7 +60,7 @@ export function CompareDialog({
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [bossWarning, setBossWarning] = useState(false);
-  const [pendingResult, setPendingResult] = useState<{ assignments: MitigationAssignment[]; label: string } | null>(null);
+  const [pendingResult, setPendingResult] = useState<{ assignments: MitigationAssignment[]; label: string; url: string } | null>(null);
 
   const urlType = detectUrlType(url);
 
@@ -74,7 +74,7 @@ export function CompareDialog({
 
   function applyPending() {
     if (!pendingResult) return;
-    onCompare(pendingResult.assignments, pendingResult.label);
+    onCompare(pendingResult.assignments, pendingResult.label, pendingResult.url);
     reset();
     setOpen(false);
   }
@@ -108,13 +108,13 @@ export function CompareDialog({
         const label = result.fight.name;
 
         if (!namesMatch(originalTitle, label)) {
-          setPendingResult({ assignments, label });
+          setPendingResult({ assignments, label, url });
           setStatus("idle");
           setBossWarning(true);
           return;
         }
 
-        onCompare(assignments, label);
+        onCompare(assignments, label, url);
         reset();
         setOpen(false);
       } else if (urlType === "plan") {
@@ -127,7 +127,7 @@ export function CompareDialog({
         if (!plan) throw new Error("Plan not found. Check that the URL is correct.");
 
         const assignments = translatePlanAssignments({ comparisonPlan: plan, originalPlayers });
-        onCompare(assignments, plan.title);
+        onCompare(assignments, plan.title, url);
         reset();
         setOpen(false);
       }
