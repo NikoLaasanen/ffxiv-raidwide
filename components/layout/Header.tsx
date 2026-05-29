@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { Sun, Moon, Plus, Menu, X } from "lucide-react";
+import { Sun, Moon, Plus, Menu, X, Search } from "lucide-react";
+import CommandPalette from "@/components/search/CommandPalette";
 
 const navLinks = [
   { href: "/my-plans", label: "My Plans" },
@@ -17,10 +18,22 @@ export default function Header() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <header className="relative border-b border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-950 shrink-0">
@@ -59,12 +72,12 @@ export default function Header() {
 
         <div className="flex-1" />
 
-        {/* ⌘K search shortcut — visual only */}
+        {/* ⌘K search shortcut */}
         <button
           type="button"
-          aria-label="Search plans and encounters (coming soon)"
-          disabled
-          className="hidden md:inline-flex items-center gap-2 h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-zinc-400 dark:text-slate-500 text-[12.5px] min-w-[200px] cursor-not-allowed select-none"
+          aria-label="Search plans and encounters"
+          onClick={() => setSearchOpen(true)}
+          className="hidden md:inline-flex items-center gap-2 h-8 px-2.5 rounded-lg border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-zinc-400 dark:text-slate-500 text-[12.5px] min-w-[200px] hover:text-zinc-600 dark:hover:text-slate-300 hover:border-zinc-300 dark:hover:border-slate-700 transition-colors select-none"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.5" y2="16.5"/>
@@ -109,6 +122,14 @@ export default function Header() {
       {/* Mobile menu panel */}
       {menuOpen && (
         <div className="md:hidden absolute top-[60px] left-0 right-0 z-50 border-b border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 flex flex-col gap-0.5">
+          <button
+            type="button"
+            onClick={() => { setMenuOpen(false); setSearchOpen(true); }}
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-[14px] text-zinc-500 dark:text-slate-400 hover:text-zinc-900 dark:hover:text-slate-100 transition-colors"
+          >
+            <Search size={16} />
+            Search
+          </button>
           {navLinks.map(({ href, label }) => {
             const active = pathname === href;
             return (
@@ -138,6 +159,8 @@ export default function Header() {
           </div>
         </div>
       )}
+
+      <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
     </header>
   );
 }

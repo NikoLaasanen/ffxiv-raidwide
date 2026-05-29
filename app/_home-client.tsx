@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useSyncExternalStore } from "react";
+import { useState, useEffect, useRef, useSyncExternalStore, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useFflogsImport, parseFflogsUrl } from "@/hooks/use-fflogs-import";
 import { usePlanStore } from "@/store/plan-store";
 import { getMyPlans, subscribeToMyPlans } from "@/lib/my-plans-storage";
@@ -19,6 +20,12 @@ import {
   X,
   Plus,
 } from "lucide-react";
+
+const CURRENT_PATCH = "7.5";
+
+type FilterTab = "Current" | "Savage" | "Ultimate";
+
+const parsePatch = (p: string) => parseFloat(p);
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -120,10 +127,13 @@ function EncounterCoverArt({
       style={{ background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)` }}
     >
       {imageName && (
-        <img
-          src={`/encounters/${imageName}`}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(/encounters/${imageName})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
           aria-hidden
         />
       )}
@@ -214,6 +224,7 @@ function FFLogsImportHero({
   const { mutate, isPending, error } = useFflogsImport();
 
   useEffect(() => {
+    if (window.matchMedia("(hover: none)").matches) return;
     inputRef.current?.focus();
   }, []);
 
@@ -433,6 +444,9 @@ function EncounterTile({
         imageName={enc.imageName}
         className="absolute inset-0 w-full h-full"
       >
+        {/* Bottom scrim for text legibility */}
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+
         {/* Top badges */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center gap-1.5">
           <span className="px-1.5 py-[3px] rounded bg-black/40 backdrop-blur-sm text-[10.5px] font-medium text-slate-300 tracking-wide">
@@ -448,10 +462,7 @@ function EncounterTile({
             </div>
           </div>
           <span
-            className={`w-7 h-7 rounded-full inline-flex items-center justify-center shrink-0 transition-transform group-hover:translate-x-0.5 ${highlight
-                ? "bg-primary text-primary-foreground"
-                : "bg-white/95 text-slate-900"
-              }`}
+            className="w-7 h-7 rounded-full inline-flex items-center justify-center shrink-0 bg-primary text-primary-foreground opacity-0 translate-x-1 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0"
           >
             <ArrowRight size={14} />
           </span>
@@ -473,16 +484,16 @@ function RecentPlanRow({
   return (
     <Link
       href={`/plan/${plan.editLinkId}`}
-      className={`grid items-center gap-4 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-slate-900/60 transition-colors no-underline ${!isLast ? "border-b border-zinc-100 dark:border-slate-800" : ""
+      className={`group grid items-center gap-4 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-slate-900/60 transition-colors no-underline ${!isLast ? "border-b border-zinc-100 dark:border-slate-800" : ""
         }`}
       style={{ gridTemplateColumns: "44px minmax(0,1fr) 120px 24px" }}
     >
       {/* Mini cover */}
-      <div className="w-9 h-9 rounded-md overflow-hidden shrink-0">
+      <div className="w-9 h-9 rounded-md overflow-hidden shrink-0 transition-transform duration-200 group-hover:scale-105">
         {plan.encounterType === "Savage" ? (
-          <img src="/icons/SavageFight.png" alt="Savage" className="w-full h-full object-cover" />
+          <Image src="/icons/SavageFight.png" alt="Savage" width={36} height={36} className="w-full h-full object-cover" />
         ) : plan.encounterType === "Ultimate" ? (
-          <img src="/icons/UltimateFight.png" alt="Ultimate" className="w-full h-full object-cover" />
+          <Image src="/icons/UltimateFight.png" alt="Ultimate" width={36} height={36} className="w-full h-full object-cover" />
         ) : (
           <EncounterCoverArt type={plan.encounterType ?? "Other"} uid={`row-${plan.id}`} className="w-full h-full" />
         )}
@@ -506,7 +517,7 @@ function RecentPlanRow({
       </div>
 
       {/* Arrow */}
-      <div className="text-zinc-400 dark:text-slate-600 flex justify-end">
+      <div className="text-zinc-400 dark:text-slate-600 group-hover:text-zinc-600 dark:group-hover:text-slate-400 flex justify-end transition-all duration-200 group-hover:translate-x-0.5">
         <ChevronRight size={14} />
       </div>
     </Link>
@@ -527,6 +538,7 @@ export default function HomeClient({
 
   const [encounters, setEncounters] = useState<EncounterDoc[]>(initialEncounters ?? []);
   const [isLoadingEncounters, setIsLoadingEncounters] = useState(!initialEncounters);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("Current");
 
   const plans = useSyncExternalStore(
     subscribeToMyPlans,
@@ -543,7 +555,7 @@ export default function HomeClient({
       )
       .catch(() => {})
       .finally(() => setIsLoadingEncounters(false));
-  }, []);
+  }, [initialEncounters]);
 
   const handleImportSuccess = (result: FflogsImportResult) => {
     setPendingImport(result);
@@ -558,7 +570,24 @@ export default function HomeClient({
   });
 
   const recentPlans = hasHydrated ? plans.slice(0, 6) : [];
-  const featuredEncounters = encounters.slice(0, 4);
+
+  const displayedEncounters = useMemo(() => {
+    if (activeFilter === "Current") {
+      const patches = [...new Set(encounters.map((e) => e.patch))]
+        .filter((p) => parsePatch(p) <= parsePatch(CURRENT_PATCH))
+        .sort((a, b) => parsePatch(b) - parsePatch(a));
+      const targetPatch = patches[0];
+      return targetPatch ? encounters.filter((e) => e.patch === targetPatch) : [];
+    }
+    if (activeFilter === "Savage") {
+      return [...encounters.filter((e) => e.type === "Savage")].sort(
+        (a, b) => parsePatch(b.patch) - parsePatch(a.patch),
+      );
+    }
+    return [...encounters.filter((e) => e.type === "Ultimate")].sort(
+      (a, b) => parsePatch(b.patch) - parsePatch(a.patch),
+    );
+  }, [encounters, activeFilter]);
 
   return (
     <main className="flex-1 overflow-auto">
@@ -583,7 +612,7 @@ export default function HomeClient({
           </span>
           <span className="flex-1 h-px bg-zinc-200 dark:bg-slate-800" />
           <span className="font-mono text-[12px] text-primary tracking-wide shrink-0">
-            ● Patch 7.2 · live
+            ● Patch {CURRENT_PATCH} · live
           </span>
         </div>
 
@@ -600,39 +629,42 @@ export default function HomeClient({
         <FFLogsImportHero onImportSuccess={handleImportSuccess} />
 
         {/* Encounter tiles */}
-        {(isLoadingEncounters || featuredEncounters.length > 0) && (
+        {(isLoadingEncounters || displayedEncounters.length > 0) && (
           <section className="mt-11">
             <div className="flex items-end gap-3 mb-3.5">
               <div className="flex-1">
                 <div className="text-[11px] text-zinc-400 dark:text-slate-500 uppercase tracking-[0.05em] font-medium mb-1">
-                  Current tier
+                  {activeFilter === "Current" ? "Current tier" : activeFilter}
                 </div>
                 {isLoadingEncounters ? (
                   <div className="h-[27px] w-44 rounded-md bg-zinc-100 dark:bg-slate-800 animate-pulse" />
                 ) : (
                   <h2 className="text-[22px] font-semibold tracking-tight text-zinc-900 dark:text-slate-100 leading-none m-0">
-                    {encounters[0]?.tier ?? "Encounters"}
+                    {activeFilter === "Current"
+                      ? (displayedEncounters[0]?.tier ?? "Encounters")
+                      : activeFilter === "Savage"
+                        ? "All Savage raids"
+                        : "All Ultimates"}
                   </h2>
                 )}
               </div>
-              {/* Filter pills — visual only */}
               <div className="flex gap-1.5 shrink-0">
-                {["Current", "Savage", "Ultimate", "Extreme"].map(
-                  (label, i) => (
-                    <span
-                      key={label}
-                      className={`px-3 py-1.5 rounded-full text-[12px] border select-none ${i === 0
-                          ? "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-900 dark:text-slate-100 font-medium"
-                          : "border-zinc-200 dark:border-slate-800 text-zinc-400 dark:text-slate-500"
-                        }`}
-                    >
-                      {label}
-                    </span>
-                  ),
-                )}
+                {(["Current", "Savage", "Ultimate"] as FilterTab[]).map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => setActiveFilter(label)}
+                    className={`px-3 py-1.5 rounded-full text-[12px] border select-none cursor-pointer transition-colors ${
+                      activeFilter === label
+                        ? "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-900 dark:text-slate-100 font-medium"
+                        : "border-zinc-200 dark:border-slate-800 text-zinc-400 dark:text-slate-500 hover:text-zinc-600 dark:hover:text-slate-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div key={activeFilter} className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
               {isLoadingEncounters
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <div
@@ -640,8 +672,14 @@ export default function HomeClient({
                       className="h-[200px] rounded-xl bg-zinc-100 dark:bg-slate-800 animate-pulse"
                     />
                   ))
-                : featuredEncounters.map((enc, i) => (
-                    <EncounterTile key={enc.id} enc={enc} highlight={i === 0} />
+                : displayedEncounters.map((enc, i) => (
+                    <div
+                      key={enc.id}
+                      className="animate-in fade-in slide-in-from-bottom-3 duration-300 ease-out fill-mode-backwards"
+                      style={{ animationDelay: `${i * 45}ms` }}
+                    >
+                      <EncounterTile enc={enc} highlight={i === 0} />
+                    </div>
                   ))}
             </div>
           </section>
