@@ -533,7 +533,9 @@ export default function HomeClient({
 }) {
   const router = useRouter();
   const setPendingImport = usePlanStore((s) => s.setPendingImport);
+  const setDraftPlan = usePlanStore((s) => s.setDraftPlan);
   const pendingImport = usePlanStore((s) => s.pendingImport);
+  const draftPlan = usePlanStore((s) => s.draftPlan);
   const hasHydrated = usePlanStore((s) => s._hasHydrated);
 
   const [encounters, setEncounters] = useState<EncounterDoc[]>(initialEncounters ?? []);
@@ -558,6 +560,8 @@ export default function HomeClient({
   }, [initialEncounters]);
 
   const handleImportSuccess = (result: FflogsImportResult) => {
+    // Clear any staged copy so only one draft source is active at a time.
+    setDraftPlan(null);
     setPendingImport(result);
     router.push("/plan/new");
   };
@@ -601,6 +605,18 @@ export default function HomeClient({
               label={`${pendingImport.players.length} players`}
               onContinue={() => router.push("/plan/new")}
               onDiscard={() => setPendingImport(null)}
+            />
+          </div>
+        )}
+
+        {/* Inline resume banner for an unsaved plan copy */}
+        {hasHydrated && draftPlan && (
+          <div className="mb-7">
+            <ResumeBanner
+              encounter={draftPlan.title}
+              label={`${draftPlan.players.length} players`}
+              onContinue={() => router.push("/plan/new")}
+              onDiscard={() => setDraftPlan(null)}
             />
           </div>
         )}

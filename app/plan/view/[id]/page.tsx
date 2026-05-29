@@ -28,16 +28,19 @@ export default function PlanViewPage({
   const hasHydrated = usePlanStore((s) => s._hasHydrated);
   const setPlan = usePlanStore((s) => s.setPlan);
   const setDraftPlan = usePlanStore((s) => s.setDraftPlan);
+  const setPendingImport = usePlanStore((s) => s.setPendingImport);
 
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
   function handleCopy() {
     if (!storePlan) return;
-    // Stage an unsaved copy; the draft page lets the user edit and decide
-    // whether to persist it. The original is never written to.
+    // Stage an unsaved copy; the staging page lets the user edit and decide
+    // whether to persist it. The original is never written to. Clear any
+    // pending import so only one draft source is active at a time.
+    setPendingImport(null);
     setDraftPlan(buildPlanCopy(storePlan));
-    router.push("/plan/draft");
+    router.push("/plan/new");
   }
 
   useEffect(() => {
