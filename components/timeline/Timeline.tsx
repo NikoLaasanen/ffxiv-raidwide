@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, mem
 import type { TimelineRow, MitigationAssignment, MechanicType, PlayerMistakeState } from "@/types/timeline";
 import type { DamageType } from "@/types/common";
 import type { Player, PhaseDivider } from "@/types/player";
-import { ChevronDown, ChevronRight, Play, Pause, RotateCcw, ExternalLink, Undo2, Redo2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Play, Pause, RotateCcw, ExternalLink, Undo2, Redo2, Check, Plus, X } from "lucide-react";
 import type { JobAbbreviation } from "@/types/ffixiv-job";
 import type { JobAbilityRecord } from "@/types/job-ability";
 import type { PlayerCastEvent } from "@/types/fflogs";
@@ -28,9 +28,9 @@ import { CompareDialog } from "@/components/plan/CompareDialog";
 import { usePlanStore } from "@/store/plan-store";
 import { MyTimeline } from "@/components/timeline/MyTimeline";
 import { ShareImageDialog } from "@/components/timeline/ShareImageDialog";
-import { ComparisonSummary, type DiffRow } from "@/components/timeline/ComparisonSummary";
-import { MistakeSummary, type MistakeRow } from "@/components/timeline/MistakeSummary";
-import { ConflictSummary } from "@/components/timeline/ConflictSummary";
+import type { DiffRow } from "@/components/timeline/ComparisonSummary";
+import type { MistakeRow } from "@/components/timeline/MistakeSummary";
+import { DiagnosticsPanel } from "@/components/timeline/DiagnosticsPanel";
 import { wastedAssignmentMap, conflictRows, type ConflictRow } from "@/lib/compute-conflicts";
 import { RowPeerChips } from "@/components/timeline/PresenceAvatars";
 import type { Peer } from "@/lib/collab/presence";
@@ -705,6 +705,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
   );
   const [selectedJobs, setSelectedJobs] = useState<JobAbbreviation[]>(() => allJobs);
   const [myPlanEditJobs, setMyPlanEditJobs] = useState<JobAbbreviation[]>(() => allJobs);
+  const [rosterOpen, setRosterOpen] = useState(false);
   // Keep the My-plan selector in sync with the roster without clobbering the
   // user's deselections. Reacts to the actual job set, not to reference churn
   // from remote collaboration snapshots (which re-create `allJobs` each tick).
@@ -1692,6 +1693,124 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           </div>
         )}
 
+        {!readOnly && timelineViewMode !== "my" && (
+          <section className="rounded-lg border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+            {/* Roster header — always visible */}
+            <header className="flex items-center gap-2 px-4 py-2.5">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-slate-400 shrink-0">
+                Roster
+              </span>
+              <span className={cn(
+                "inline-flex items-center h-5 px-1.5 rounded-full border text-[10.5px] font-semibold font-mono shrink-0",
+                selectedJobs.length === allJobs.length
+                  ? "bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400"
+                  : "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-500 dark:text-slate-400"
+              )}>
+                {selectedJobs.length}/{allJobs.length}
+              </span>
+              {/* Mini job preview chips — only in collapsed state */}
+              {!rosterOpen && (
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  {selectedJobs.map((job) => (
+                    <span
+                      key={job}
+                      className="inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 dark:text-slate-400 shrink-0"
+                    >
+                      <span
+                        className="w-1 h-3 rounded-sm shrink-0"
+                        style={{ backgroundColor: JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR }}
+                      />
+                      {job}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <span className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setRosterOpen((o) => !o)}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-zinc-200 dark:border-slate-700 text-xs font-medium text-zinc-600 dark:text-slate-400 hover:border-zinc-300 dark:hover:border-slate-600 hover:text-zinc-700 dark:hover:text-slate-300 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+              >
+                {rosterOpen
+                  ? <><ChevronDown size={13} /> Done</>
+                  : <><Plus size={13} /> Edit roster</>
+                }
+              </button>
+            </header>
+
+            {/* Expanded editor */}
+            {rosterOpen && (
+              <div className="px-4 pb-4 flex flex-col gap-4 border-t border-zinc-100 dark:border-slate-800 pt-3">
+                {/* Active chips with × to remove */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-zinc-500 dark:text-slate-400 shrink-0">Active</span>
+                  {selectedJobs.length === 0 && (
+                    <span className="text-xs text-zinc-400 dark:text-slate-500">
+                      No jobs yet — add some below.
+                    </span>
+                  )}
+                  {selectedJobs.map((job) => (
+                    <button
+                      key={job}
+                      onClick={() => toggleJob(job)}
+                      disabled={isLoading}
+                      className="inline-flex items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-md text-xs font-medium border bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <span
+                        className="w-1 h-3.5 rounded-sm shrink-0"
+                        style={{ backgroundColor: JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR }}
+                      />
+                      {job}
+                      <X size={11} className="text-zinc-400 dark:text-slate-500 ml-0.5 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-zinc-100 dark:border-slate-800 -mx-4" />
+
+                {/* Role-grouped job picker */}
+                <div className="flex flex-col gap-2.5">
+                  <span className="text-xs text-zinc-500 dark:text-slate-400">Add jobs</span>
+                  {JOB_GROUPS.map(({ label, jobs }) => (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-400 dark:text-slate-500 w-14 shrink-0">
+                        {label}
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {jobs.map((job) => {
+                          const active = selectedJobs.includes(job);
+                          return (
+                            <button
+                              key={job}
+                              type="button"
+                              onClick={() => toggleJob(job)}
+                              disabled={isLoading}
+                              className={cn(
+                                "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium border transition-colors disabled:opacity-50 cursor-pointer",
+                                active
+                                  ? "bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500"
+                                  : "bg-transparent border-zinc-200 dark:border-slate-700 text-zinc-500 dark:text-slate-400 hover:border-zinc-300 dark:hover:border-slate-600 hover:text-zinc-700 dark:hover:text-slate-200"
+                              )}
+                            >
+                              {active
+                                ? <Check size={11} className="text-teal-600 dark:text-teal-400 shrink-0" />
+                                : <Plus size={11} className="text-zinc-400 dark:text-slate-500 shrink-0" />
+                              }
+                              {JOB_NAMES[job]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         {timelineViewMode === "full" && (
         <div ref={scrollContainerRef} onMouseLeave={onHover ? () => stableHover(null, null) : undefined} className="relative overflow-auto min-h-48 max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
           {isLoading && (
@@ -1874,76 +1993,17 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
           />
         )}
 
-        {isComparing && <ComparisonSummary rows={comparisonSummaryRows} label={comparisonLabel} url={comparisonUrl} />}
+        <DiagnosticsPanel
+          conflictRows={conflictSummaryRows}
+          onRemove={removeAssignments}
+          mistakeRows={mistakeSummaryRows}
+          showMistakes={showMistakesColumn}
+          comparisonRows={comparisonSummaryRows}
+          comparisonLabel={comparisonLabel}
+          comparisonUrl={comparisonUrl}
+          isComparing={isComparing}
+        />
 
-        {conflictSummaryRows.length > 0 && <ConflictSummary rows={conflictSummaryRows} onRemove={removeAssignments} />}
-
-        {showMistakesColumn && mistakeSummaryRows.length > 0 && <MistakeSummary rows={mistakeSummaryRows} />}
-
-        {!readOnly && timelineViewMode !== "my" && <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 dark:border-slate-800 p-4">
-          {/* Active roster strip — Option A */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-slate-400">
-              Active in timeline
-            </span>
-            <span className={cn(
-              "inline-flex items-center h-5 px-1.5 rounded-full border text-[10.5px] font-semibold font-mono",
-              selectedJobs.length === allJobs.length
-                ? "bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400"
-                : "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-500 dark:text-slate-400"
-            )}>
-              {selectedJobs.length}/{allJobs.length}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5 pb-1">
-            {selectedJobs.map((job) => (
-              <button
-                key={job}
-                onClick={() => toggleJob(job)}
-                disabled={isLoading}
-                className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium border bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60 text-zinc-700 dark:text-slate-200 hover:border-teal-400 dark:hover:border-teal-500 transition-colors disabled:opacity-50"
-              >
-                <span
-                  className="w-1 h-3.5 rounded-sm shrink-0"
-                  style={{ backgroundColor: JOB_ROLE_COLOR[job] ?? FALLBACK_JOB_COLOR }}
-                />
-                {job}
-                <span className="text-zinc-400 dark:text-slate-500 ml-0.5 leading-none">×</span>
-              </button>
-            ))}
-            {Array.from({ length: Math.max(0, allJobs.length - selectedJobs.length) }).map((_, i) => (
-              <span
-                key={`slot-${i}`}
-                className="inline-flex items-center justify-center h-7 px-3 rounded-md text-xs border border-dashed border-zinc-200 dark:border-slate-700 text-zinc-300 dark:text-slate-600 font-mono"
-              >
-                —
-              </span>
-            ))}
-          </div>
-          <div className="border-t border-zinc-200 dark:border-slate-700 -mx-4 mb-1" />
-          <p className="text-xs font-medium text-zinc-500 dark:text-slate-400 mb-1">Jobs</p>
-          {JOB_GROUPS.map(({ label, jobs }) => (
-            <div key={label} className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 dark:text-slate-500 w-14 shrink-0">
-                {label}
-              </span>
-              <div className="flex flex-wrap gap-1">
-                {jobs.map((job) => (
-                  <Button
-                    key={job}
-                    size="sm"
-                    variant={selectedJobs.includes(job) ? "default" : "outline"}
-                    className="h-7 px-2.5 text-xs"
-                    onClick={() => toggleJob(job)}
-                    disabled={isLoading}
-                  >
-                    {JOB_NAMES[job]}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>}
       </div>
     </TooltipProvider>
   );
