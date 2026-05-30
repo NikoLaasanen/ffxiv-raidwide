@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { AlertTriangle, ArrowLeftRight, ChevronDown, ChevronRight, ExternalLink, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -300,15 +300,20 @@ export function DiagnosticsPanel({
 
   const visible = hasConflicts || isComparing || hasMistakes;
 
-  const defaultTab = useMemo<Tab>(() => {
-    if (hasConflicts) return "wasted";
-    if (hasMistakes) return "mistakes";
-    return "compare";
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // The "wasted" hero tab is always present when the panel is visible; the
+  // mistakes/compare tabs only exist when their data is available.
+  const preferredTab: Tab = hasConflicts ? "wasted" : hasMistakes ? "mistakes" : isComparing ? "compare" : "wasted";
 
-  const [tab, setTab] = useState<Tab>(defaultTab);
+  // `null` until the user picks a tab — until then we follow `preferredTab`,
+  // which reacts to data loading in (abilities/conflicts arrive after mount).
+  const [tab, setTab] = useState<Tab | null>(null);
   const [open, setOpen] = useState(true);
+
+  // Fall back to the preferred tab if the chosen one isn't currently available
+  // (e.g. comparison was cleared, or mistakes are hidden).
+  const tabAvailable =
+    tab === "wasted" || (tab === "mistakes" && hasMistakes) || (tab === "compare" && isComparing);
+  const activeTab: Tab = tab && tabAvailable ? tab : preferredTab;
 
   if (!visible) return null;
 
@@ -339,7 +344,7 @@ export function DiagnosticsPanel({
           onClick={() => setTab("wasted")}
           className={cn(
             "inline-flex items-center gap-2 h-9 px-3.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer",
-            tab === "wasted"
+            activeTab === "wasted"
               ? "border border-amber-300 dark:border-amber-500/40 bg-amber-50/40 dark:bg-amber-950/10 text-amber-700 dark:text-amber-400"
               : "border border-transparent text-zinc-500 dark:text-slate-400 hover:text-zinc-700 dark:hover:text-slate-200"
           )}
@@ -349,7 +354,7 @@ export function DiagnosticsPanel({
           <span
             className={cn(
               "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full border text-[10.5px] font-bold font-mono",
-              tab === "wasted"
+              activeTab === "wasted"
                 ? "bg-amber-100 dark:bg-amber-900/40 border-amber-300 dark:border-amber-500/50 text-amber-700 dark:text-amber-400"
                 : "bg-zinc-100 dark:bg-slate-800 border-zinc-200 dark:border-slate-700 text-zinc-500 dark:text-slate-400"
             )}
@@ -370,7 +375,7 @@ export function DiagnosticsPanel({
             onClick={() => setTab("mistakes")}
             className={cn(
               "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer",
-              tab === "mistakes"
+              activeTab === "mistakes"
                 ? "bg-zinc-100 dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 text-zinc-800 dark:text-slate-100"
                 : "border border-transparent text-zinc-500 dark:text-slate-400 hover:text-zinc-700 dark:hover:text-slate-200"
             )}
@@ -389,7 +394,7 @@ export function DiagnosticsPanel({
             onClick={() => setTab("compare")}
             className={cn(
               "inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium transition-colors cursor-pointer",
-              tab === "compare"
+              activeTab === "compare"
                 ? "bg-zinc-100 dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 text-zinc-800 dark:text-slate-100"
                 : "border border-transparent text-zinc-500 dark:text-slate-400 hover:text-zinc-700 dark:hover:text-slate-200"
             )}
@@ -410,13 +415,13 @@ export function DiagnosticsPanel({
         <span className="flex-1" />
 
         {/* Context action */}
-        {tab === "wasted" && wastedTotal > 0 && open && (
+        {activeTab === "wasted" && wastedTotal > 0 && open && (
           <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={removeAll}>
             <Trash2 size={13} />
             Remove all
           </Button>
         )}
-        {tab === "compare" && comparisonUrl && open && (
+        {activeTab === "compare" && comparisonUrl && open && (
           <a
             href={comparisonUrl}
             target="_blank"
@@ -441,9 +446,9 @@ export function DiagnosticsPanel({
 
       {open && (
         <div className="p-4">
-          {tab === "wasted" && <WastedTab rows={conflictRows} onRemove={onRemove} />}
-          {tab === "mistakes" && <MistakesTab rows={mistakeRows} />}
-          {tab === "compare" && <ComparisonTab rows={comparisonRows} />}
+          {activeTab === "wasted" && <WastedTab rows={conflictRows} onRemove={onRemove} />}
+          {activeTab === "mistakes" && <MistakesTab rows={mistakeRows} />}
+          {activeTab === "compare" && <ComparisonTab rows={comparisonRows} />}
         </div>
       )}
     </section>

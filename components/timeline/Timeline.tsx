@@ -27,6 +27,7 @@ import { PreferencesDialog } from "@/components/preferences/PreferencesDialog";
 import { CompareDialog } from "@/components/plan/CompareDialog";
 import { usePlanStore } from "@/store/plan-store";
 import { MyTimeline } from "@/components/timeline/MyTimeline";
+import { MobileFullTimeline } from "@/components/timeline/MobileFullTimeline";
 import { ShareImageDialog } from "@/components/timeline/ShareImageDialog";
 import type { DiffRow } from "@/components/timeline/ComparisonSummary";
 import type { MistakeRow } from "@/components/timeline/MistakeSummary";
@@ -59,7 +60,7 @@ interface TimelineProps {
   onHover?: (timestamp: number | null, job: JobAbbreviation | null) => void;
 }
 
-type CellState = {
+export type CellState = {
   assigned: boolean;
   onCooldown: boolean;
   inDuration: boolean;
@@ -1812,7 +1813,22 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
         )}
 
         {timelineViewMode === "full" && (
-        <div ref={scrollContainerRef} onMouseLeave={onHover ? () => stableHover(null, null) : undefined} className="relative overflow-auto min-h-48 max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
+        <>
+        {/* Mobile card layout — phones only */}
+        <MobileFullTimeline
+          className="md:hidden"
+          visibleRows={visibleRows}
+          phases={localPhases}
+          rowCellStates={rowCellStates}
+          rowMitigations={rowMitigations}
+          selectedJobs={selectedJobs}
+          abilitiesByJob={filteredAbilitiesByJob}
+          onToggle={stableToggle}
+          onTogglePhase={stableTogglePhase}
+          readOnly={readOnly}
+        />
+        {/* Desktop matrix — md and up */}
+        <div ref={scrollContainerRef} onMouseLeave={onHover ? () => stableHover(null, null) : undefined} className="hidden md:block relative overflow-auto min-h-48 max-h-[calc(100vh-16rem)] rounded-lg border border-zinc-200 dark:border-slate-800">
           {isLoading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-white/70 dark:bg-slate-950/70 backdrop-blur-[2px]">
               <div className="flex flex-col items-center gap-2 text-sm text-zinc-500 dark:text-slate-400">
@@ -1979,6 +1995,7 @@ export function Timeline({ timeline, players, casts, phases = EMPTY_PHASES, init
             </tbody>
           </table>
         </div>
+        </>
         )}
         {timelineViewMode === "my" && (
           <MyTimeline
