@@ -140,7 +140,7 @@ export function PlanStagingEditor({ plan, hasHydrated, badgeLabel, casts, onCons
         onAssignmentsChange={handleAssignmentsChange}
         onPhasesChange={handlePhasesChange}
         title={plan.title}
-        encounterId={plan.encounterId}
+        encounterTier={plan.encounterTier}
         headerLeft={
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {plan.players.length} players · {visibleRows.length} timeline events · {duration}
